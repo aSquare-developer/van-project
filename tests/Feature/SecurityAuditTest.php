@@ -34,6 +34,14 @@ class SecurityAuditTest extends TestCase
         $this->assertSame(1, ActivityLog::where('event', 'auth.login')->count());
     }
 
+    public function test_throttled_authentication_attempt_is_audited(): void
+    {
+        for ($attempt = 0; $attempt < 6; $attempt++) {
+            $this->post('/login', ['email' => 'audit-limit@example.test', 'password' => 'wrong']);
+        }
+        $this->assertDatabaseHas('activity_logs', ['event' => 'auth.lockout']);
+    }
+
     public function test_admin_changes_are_logged_atomically_and_survive_subject_deletion(): void
     {
         $admin = User::factory()->create(['role' => Role::Admin]);

@@ -18,7 +18,7 @@ class SessionController extends Controller
 
     public function store(Request $request): RedirectResponse
     {
-        $credentials = $request->validate(['email' => ['required', 'email'], 'password' => ['required', 'string']]);
+        $credentials = $request->validate(['email' => ['required', 'email'], 'password' => ['required', 'string', 'max:1024']]);
         $credentials['email'] = strtolower($credentials['email']);
         $credentials['is_active'] = true;
 

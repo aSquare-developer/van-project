@@ -61,6 +61,16 @@ class UserManagementTest extends TestCase
         $this->assertDatabaseCount('users', 1);
     }
 
+    public function test_passwords_exceeding_bcrypt_byte_limit_are_rejected_without_server_errors(): void
+    {
+        $admin = User::factory()->create(['role' => Role::Admin]);
+        $this->signIn($admin);
+        foreach (['Secure1!'.str_repeat('x', 80), 'Secure1!'.str_repeat('ä', 40)] as $password) {
+            $this->post('/admin/users', $this->data(['password' => $password, 'password_confirmation' => $password]))->assertSessionHasErrors('password');
+        }
+        $this->assertDatabaseCount('users', 1);
+    }
+
     public function test_admin_cannot_block_or_delete_self_or_demote_last_active_admin(): void
     {
         $admin = User::factory()->create(['role' => Role::Admin]);
