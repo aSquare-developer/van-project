@@ -12,3 +12,14 @@
 /.idea/
 /.vscode/
 .DS_Store
+
+/bootstrap/cache/*.php
+/storage/framework/cache/*
+!/storage/framework/cache/.gitignore
+/storage/framework/sessions/*
+!/storage/framework/sessions/.gitignore
+/storage/framework/views/*
+!/storage/framework/views/.gitignore
+/database/*.sqlite*
+/public/hot
+/auth.json
