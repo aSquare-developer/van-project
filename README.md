@@ -1,2 +1,2 @@
 # van-project
-University project
+University project computer vision
