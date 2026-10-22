@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SessionController;
 use Illuminate\Support\Facades\Route;
@@ -14,6 +15,9 @@ Route::middleware('guest')->group(function (): void {
     Route::post('/reset-password', [PasswordResetController::class, 'update'])->middleware('throttle:password-reset')->name('password.update');
 });
 Route::middleware(['auth', 'active'])->group(function (): void {
+    Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function (): void {
+        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+    });
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');
 });
