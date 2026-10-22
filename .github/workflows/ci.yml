@@ -1,0 +1,20 @@
+name: CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify initial repository structure
+        run: |
+          test -f .env.example
+          test -f .gitignore
+          test -f docs/architecture.md
+          if test -f artisan; then
+            echo "Laravel detected; add PHP dependencies, tests and frontend build to CI before merging application code."
+            exit 1
+          fi
