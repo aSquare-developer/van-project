@@ -11,7 +11,7 @@ class EnsureActiveAccount
 {
     public function handle(Request $request, Closure $next): Response
     {
-        $user = $request->user();
+        $user = $request->user()?->fresh();
         if (! $user || ! $user->is_active || $request->session()->get('auth_version') !== $user->session_version) {
             Auth::logout();
             $request->session()->invalidate();
@@ -19,6 +19,8 @@ class EnsureActiveAccount
 
             return redirect()->route('login')->withErrors(['email' => 'Your session has expired. Please sign in again.']);
         }
+
+        Auth::setUser($user);
 
         return $next($request);
     }
