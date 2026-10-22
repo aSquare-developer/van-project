@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Admin\ActivityLogController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SessionController;
@@ -17,6 +18,7 @@ Route::middleware('guest')->group(function (): void {
 });
 Route::middleware(['auth', 'active'])->group(function (): void {
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function (): void {
+        Route::get('/activity', ActivityLogController::class)->name('activity.index');
         Route::resource('users', UserController::class)->except('show');
     });
     Route::get('/dashboard', DashboardController::class)->name('dashboard');

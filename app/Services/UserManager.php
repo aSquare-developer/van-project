@@ -11,6 +11,8 @@ use Illuminate\Validation\ValidationException;
 
 class UserManager
 {
+    public function __construct(private AuditLogger $audit) {}
+
     private function synchronized(Closure $operation): mixed
     {
         return DB::transaction(function () use ($operation): mixed {
@@ -31,7 +33,10 @@ class UserManager
         return $this->synchronized(function () use ($actor, $data): User {
             $this->authorizeActor($actor);
 
-            return $this->insert($data);
+            $user = $this->insert($data);
+            $this->audit->record('user.created', $actor->id, $user->id);
+
+            return $user;
         });
     }
 
@@ -42,7 +47,10 @@ class UserManager
                 throw ValidationException::withMessages(['email' => 'An active administrator already exists. Use the administration panel.']);
             }
 
-            return $this->insert([...$data, 'role' => Role::Admin->value, 'is_active' => true]);
+            $user = $this->insert([...$data, 'role' => Role::Admin->value, 'is_active' => true]);
+            $this->audit->record('admin.bootstrapped', null, $user->id);
+
+            return $user;
         });
     }
 
@@ -71,6 +79,8 @@ class UserManager
             $email = strtolower($data['email']);
             $revoke = $subject->role !== $role || $subject->is_active !== $active || $subject->email !== $email || ! empty($data['password']);
             $oldEmail = $subject->email;
+            $oldRole = $subject->role;
+            $oldActive = $subject->is_active;
             $subject->forceFill(['name' => $data['name'], 'email' => $email, 'role' => $role, 'is_active' => $active]);
             if (! empty($data['password'])) {
                 $subject->password = $data['password'];
@@ -82,6 +92,13 @@ class UserManager
                 DB::table('password_reset_tokens')->where('email', $oldEmail)->delete();
             }
             $subject->save();
+            $this->audit->record('user.updated', $actor->id, $subject->id, array_keys($subject->getChanges()));
+            if ($oldRole !== $role) {
+                $this->audit->record('user.role_changed', $actor->id, $subject->id, ['role']);
+            }
+            if ($oldActive !== $active) {
+                $this->audit->record($active ? 'user.unblocked' : 'user.blocked', $actor->id, $subject->id, ['is_active']);
+            }
 
             return $subject;
         });
@@ -95,6 +112,7 @@ class UserManager
             $this->protectAdministrator($actor, $subject, true, false);
             DB::table('sessions')->where('user_id', $subject->id)->delete();
             DB::table('password_reset_tokens')->where('email', $subject->email)->delete();
+            $this->audit->record('user.deleted', $actor->id, $subject->id);
             $subject->delete();
         });
     }
