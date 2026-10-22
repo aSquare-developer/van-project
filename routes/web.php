@@ -16,7 +16,7 @@ Route::middleware('guest')->group(function (): void {
 });
 Route::middleware(['auth', 'active'])->group(function (): void {
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function (): void {
-        Route::get('/users', [UserController::class, 'index'])->name('users.index');
+        Route::resource('users', UserController::class)->except('show');
     });
     Route::view('/dashboard', 'dashboard')->name('dashboard');
     Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');

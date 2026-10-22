@@ -17,6 +17,7 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('users', function (Blueprint $table): void {
+            $table->dropIndex(['is_active']);
             $table->dropColumn(['is_active', 'session_version']);
         });
     }
