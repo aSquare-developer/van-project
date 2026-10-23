@@ -70,6 +70,8 @@ Awaiting-review and closed checklists reject photo uploads. Closed shifts have n
 
 Workflow endpoints use session authentication, active-account policies, CSRF protection, validated fields and a 30/minute per-account throttle. Terminal state/history/audit updates share one transaction. MySQL CI tests real simultaneous duplicate completion, photo-upload/finalize races and competing administrator decisions; SQLite skips these row-locking tests.
 
+A new upload is a new attempt, not proof that the image was freshly captured during the shift. Gallery selection is supported; there is no liveness/anti-replay attestation. Passing analysis also does not establish real-world model accuracy: that requires the separate real-image acceptance tests.
+
 ## Verification
 
-See [security.md](security.md) for SEC-001–SEC-007 and [deployment.md](deployment.md) for deployment. CI tests supported PHP versions against MySQL 8.4, including a two-process race test; SQLite local tests skip that one test.
+See [security.md](security.md) for SEC-001–SEC-007 and [deployment.md](deployment.md) for deployment. CI tests supported PHP versions against MySQL 8.4, including multi-process race tests; SQLite local tests skip MySQL-only row-locking tests.
