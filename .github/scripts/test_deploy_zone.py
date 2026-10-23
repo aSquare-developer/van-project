@@ -84,6 +84,14 @@ fi
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(os.readlink(self.root / 'public'), 'current/public')
 
+    def test_private_archive_root_is_made_traversable_for_the_web_server(self):
+        self.payload.chmod(0o700)
+        self.package()
+        result = self.deploy()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual((self.root / 'current').stat().st_mode & 0o777, 0o755)
+        self.assertEqual((self.root / '.env').stat().st_mode & 0o777, 0o600)
+
     def test_failed_migration_keeps_previous_release_and_exits_maintenance(self):
         self.existing_release()
         result = self.deploy(FAKE_FAIL_ON='migrate')
