@@ -28,4 +28,34 @@
             <li class="rounded-xl border border-slate-200 bg-white p-6 text-sm text-slate-500">No checklist items are available. Contact an administrator.</li>
         @endforelse
     </ol>
+    @can('submit', $shift)
+        <section class="mt-8 rounded-2xl border border-slate-200 bg-white p-5 sm:p-6" aria-label="Finish inspection">
+            <h2 class="text-xl font-semibold">Finish inspection</h2>
+            @if($assessment['can_complete'])
+                <p class="mt-3 text-sm text-slate-600">All required items have confirmed passing results. Completing locks this checklist.</p>
+                <form class="mt-5" method="POST" action="{{ route('shifts.complete', $shift) }}">
+                    @csrf
+                    <input type="hidden" name="request_key" value="{{ Illuminate\Support\Str::uuid() }}">
+                    <input type="hidden" name="revision" value="{{ $shift->revision }}">
+                    <button class="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white">Complete inspection</button>
+                </form>
+            @elseif($assessment['can_request_review'])
+                <p class="mt-3 text-sm text-slate-600">Some required items were not confirmed. Explain the problem and ask an administrator to review your saved photos. This does not mark those items as passed.</p>
+                <form class="mt-5 space-y-4" method="POST" action="{{ route('shifts.review-request', $shift) }}">
+                    @csrf
+                    <input type="hidden" name="request_key" value="{{ Illuminate\Support\Str::uuid() }}">
+                    <input type="hidden" name="revision" value="{{ $shift->revision }}">
+                    <label class="block text-sm font-medium">Explanation<textarea name="comment" required maxlength="2000" rows="4" class="mt-2 block w-full rounded-lg border border-slate-300 p-3">{{ old('comment') }}</textarea></label>
+                    <button class="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white">Send for administrator review</button>
+                </form>
+            @elseif($shift->status === App\Enums\ShiftStatus::AwaitingReview)
+                <p class="mt-3 text-sm text-slate-600">Waiting for an administrator. Photo uploads are locked until a decision is recorded.</p>
+            @elseif(in_array($shift->status, [App\Enums\ShiftStatus::Completed, App\Enums\ShiftStatus::CompletedWithRemarks], true))
+                <p class="mt-3 text-sm text-slate-600">This inspection is closed. Photos and results cannot be changed.</p>
+            @else
+                <p class="mt-3 text-sm text-slate-600">{{ $assessment['blocking_reason'] }}</p>
+            @endif
+        </section>
+    @endcan
+    <x-shift-workflow-history :shift="$shift" :transitions="$transitions" />
 </x-layout>

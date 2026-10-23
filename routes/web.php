@@ -9,6 +9,7 @@ use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\InspectionPhotoController;
+use App\Http\Controllers\ShiftWorkflowController;
 use App\Http\Controllers\WorkerShiftController;
 use Illuminate\Support\Facades\Route;
 
@@ -29,10 +30,13 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         Route::resource('templates', InspectionTemplateController::class)->except(['show', 'destroy'])->middlewareFor(['store', 'update'], 'throttle:inspection-uploads');
         Route::get('/templates/{template}/items/{item}/reference', [InspectionPhotoController::class, 'templateReference'])->scopeBindings()->name('templates.items.reference');
         Route::resource('shifts', ShiftController::class)->only(['index', 'create', 'store', 'show']);
+        Route::post('/shifts/{shift}/review', [ShiftWorkflowController::class, 'review'])->middleware('throttle:30,1')->name('shifts.review');
     });
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/shifts', [WorkerShiftController::class, 'index'])->name('shifts.index');
     Route::get('/shifts/{shift}', [WorkerShiftController::class, 'show'])->name('shifts.show');
+    Route::post('/shifts/{shift}/complete', [ShiftWorkflowController::class, 'complete'])->middleware('throttle:30,1')->name('shifts.complete');
+    Route::post('/shifts/{shift}/review-request', [ShiftWorkflowController::class, 'requestReview'])->middleware('throttle:30,1')->name('shifts.review-request');
     Route::get('/shifts/{shift}/checks/{check}', [WorkerShiftController::class, 'check'])->scopeBindings()->name('shifts.checks.show');
     Route::post('/shifts/{shift}/checks/{check}/photos', [InspectionPhotoController::class, 'store'])->scopeBindings()->middleware('throttle:inspection-uploads')->name('shifts.checks.photos.store');
     Route::get('/shifts/{shift}/checks/{check}/attempts/{attempt}/photo', [InspectionPhotoController::class, 'attempt'])->scopeBindings()->name('shifts.checks.attempts.photo');

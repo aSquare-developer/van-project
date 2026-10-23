@@ -44,6 +44,9 @@ class ShiftAssigner
             if ($items->isEmpty()) {
                 throw ValidationException::withMessages(['inspection_template_id' => 'The template must contain at least one item.']);
             }
+            if ($items->where('is_required', true)->isEmpty()) {
+                throw ValidationException::withMessages(['inspection_template_id' => 'The template must contain at least one required item.']);
+            }
             foreach ($items as $item) {
                 $definition = config('inspections.checks.'.$item->check_key);
                 if (! is_array($definition) || ($definition['expected_class'] ?? null) !== $item->expected_class) {

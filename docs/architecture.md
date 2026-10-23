@@ -51,6 +51,27 @@ For `absent`, class must be `holder_empty`; for `uncertain`, class must be null.
 
 An attempt preserves normalized result, class, confidence, boxes, model version, timestamps and sanitized error code. The queue contains only the attempt ID; private bytes and bearer tokens stay out of the payload. No raw provider body is retained. Result/audit/check changes commit together. Only the newest attempt can change an editable shift check, and a processing-token comparison prevents an expired worker from committing after a replacement claim. Closed or under-review shifts are never silently changed by late analysis. The browser shows attempt status and confidence; refreshing retrieves the latest server state. No live camera inference is implemented.
 
+## Inspection completion and review
+
+These states describe checklist verification, not attendance, working hours or payroll. Each assigned worker has an independent shift/checklist. `completed_at` is the time the inspection was closed.
+
+| Action | Allowed source | Evidence / authorization | Target |
+| --- | --- | --- | --- |
+| Complete inspection | assigned, in_progress, returned_for_check | Active assigned worker; every required item has a valid latest passing analysis and private photo | completed |
+| Request review | same editable states | Active assigned worker; every required item has a photo and terminal analysis, at least one is not confirmed; explanation required | awaiting_review |
+| Approve with remarks | awaiting_review | Active Admin other than the assigned worker; unchanged request/evidence; recorded explanation | completed_with_remarks |
+| Return for checking | awaiting_review | Active Admin other than the assigned worker; recorded instructions | returned_for_check |
+
+Unscanned required items, queued/processing latest attempts (including optional items), empty/no-required checklists and invalid or missing evidence cannot be submitted as completed or for review. Assignment now rejects templates without required items, avoiding unfinishable new checklists. Legacy zero-required assignments need a new correctly configured assignment, not a status override. A finished analysis error is eligible for **manual review only**, never normal completion. Optional unscanned/terminal nonpassing items do not block normal completion. Superseded attempts do not satisfy required evidence and do not block a newer terminal result. After return, every required item that was unconfirmed at that decision needs a new photo and finished analysis before the next submission; already-passed items need not be rescanned.
+
+The workflow rechecks the actor and locks the shift before checking the latest attempts. Photo submissions, applicable terminal analyses and workflow actions increment the shift revision. POSTs require the displayed revision and a UUID scoped to the shift. Identical retries return the original transition; key reuse for a changed actor/action/comment/revision is rejected. Stale pages and competing decisions cannot silently finalize newer evidence. Shift/check locks serialize workflow changes against photo uploads and analysis commits. The database unique action key provides a second guard.
+
+Awaiting-review and closed checklists reject photo uploads. Closed shifts have no edit/reopen workflow. A return is permitted even if an evidence file has disappeared, allowing a new capture; approval without valid photo evidence is forbidden. Admin approval never changes analysis/check results to passed. Each transition stores actor, previous/next state, timestamp, comment, revisions and the exact check/attempt/result snapshot. Worker/Admin pages show paginated decision history and scoped links to those photos. Attempt/decision records survive photo retention; comments are escaped, access-controlled and excluded from general audit metadata. Reviewer accounts with decision history must be blocked rather than deleted.
+
+Workflow endpoints use session authentication, active-account policies, CSRF protection, validated fields and a 30/minute per-account throttle. Terminal state/history/audit updates share one transaction. MySQL CI tests real simultaneous duplicate completion, photo-upload/finalize races and competing administrator decisions; SQLite skips these row-locking tests.
+
+A new upload is a new attempt, not proof that the image was freshly captured during the shift. Gallery selection is supported; there is no liveness/anti-replay attestation. Passing analysis also does not establish real-world model accuracy: that requires the separate real-image acceptance tests.
+
 ## Verification
 
-See [security.md](security.md) for SEC-001–SEC-007 and [deployment.md](deployment.md) for deployment. CI tests supported PHP versions against MySQL 8.4, including a two-process race test; SQLite local tests skip that one test.
+See [security.md](security.md) for SEC-001–SEC-007 and [deployment.md](deployment.md) for deployment. CI tests supported PHP versions against MySQL 8.4, including multi-process race tests; SQLite local tests skip MySQL-only row-locking tests.

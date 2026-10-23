@@ -40,4 +40,12 @@ class CsrfTest extends TestCase
     {
         $this->withSession(['_token' => 'expected-token'])->post('/shifts/1/checks/1/photos', ['_token' => 'wrong-token'])->assertStatus(419);
     }
+
+    public function test_workflow_actions_reject_missing_and_invalid_csrf_tokens(): void
+    {
+        foreach (['/shifts/1/complete', '/shifts/1/review-request', '/admin/shifts/1/review'] as $path) {
+            $this->withSession(['_token' => 'expected-token'])->post($path)->assertStatus(419);
+            $this->withSession(['_token' => 'expected-token'])->post($path, ['_token' => 'wrong-token'])->assertStatus(419);
+        }
+    }
 }

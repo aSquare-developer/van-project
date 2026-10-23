@@ -18,7 +18,12 @@ class Shift extends Model
 
     protected function casts(): array
     {
-        return ['shift_date' => 'immutable_date', 'status' => ShiftStatus::class];
+        return ['shift_date' => 'immutable_date', 'status' => ShiftStatus::class, 'revision' => 'integer', 'completed_at' => 'immutable_datetime'];
+    }
+
+    public function transitions(): HasMany
+    {
+        return $this->hasMany(ShiftTransition::class);
     }
 
     public function scopeVisibleTo(Builder $query, User $user): void
