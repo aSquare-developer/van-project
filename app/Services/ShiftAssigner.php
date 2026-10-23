@@ -71,7 +71,7 @@ class ShiftAssigner
                     'status' => CheckStatus::Pending,
                 ])->save();
             }
-            $this->audit->record('shift.assigned', $actor->id, $worker->id);
+            $this->audit->record('shift.assigned', $actor->id, $worker->id, resource: $shift);
 
             return $shift->load('checks');
         }, 3);
