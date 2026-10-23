@@ -97,6 +97,7 @@ class InspectionAnalysis
             $latestId = $check->attempts()->max('id');
             if ((int) $latestId === $attempt->id && in_array($shift->status, [ShiftStatus::Assigned, ShiftStatus::InProgress, ShiftStatus::ReturnedForCheck], true)) {
                 $check->forceFill(['status' => $status])->save();
+                $shift->forceFill(['revision' => $shift->revision + 1])->save();
             }
             $this->audit->record('inspection.analysis_finished', resource: $attempt);
         }, 3);

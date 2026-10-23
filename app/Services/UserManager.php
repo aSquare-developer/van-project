@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\Role;
 use App\Models\InspectionPhoto;
 use App\Models\Shift;
+use App\Models\ShiftTransition;
 use App\Models\User;
 use Closure;
 use Illuminate\Support\Facades\DB;
@@ -113,7 +114,8 @@ class UserManager
             $subject = User::query()->lockForUpdate()->findOrFail($subjectId);
             $this->protectAdministrator($actor, $subject, true, false);
             if (Shift::query()->where('worker_id', $subject->id)->orWhere('assigned_by', $subject->id)->exists()
-                || InspectionPhoto::query()->where('uploaded_by', $subject->id)->exists()) {
+                || InspectionPhoto::query()->where('uploaded_by', $subject->id)->exists()
+                || ShiftTransition::query()->where('actor_id', $subject->id)->exists()) {
                 throw ValidationException::withMessages(['user' => 'This account has inspection or shift history. Block the account instead of deleting it.']);
             }
             DB::table('sessions')->where('user_id', $subject->id)->delete();

@@ -48,9 +48,7 @@ class InspectionPhotoSubmission
                     'confidence_threshold' => config('inspections.checks.'.$check->check_key.'.confidence_threshold', 0.8),
                 ])->save();
                 $check->forceFill(['status' => CheckStatus::Pending])->save();
-                if ($shift->status !== ShiftStatus::InProgress) {
-                    $shift->forceFill(['status' => ShiftStatus::InProgress])->save();
-                }
+                $shift->forceFill(['status' => ShiftStatus::InProgress, 'revision' => $shift->revision + 1])->save();
                 $this->audit->record('inspection.photo_submitted', $actor->id, resource: $attempt);
 
                 return $attempt;

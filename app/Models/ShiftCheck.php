@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class ShiftCheck extends Model
 {
@@ -27,6 +28,11 @@ class ShiftCheck extends Model
     public function attempts(): HasMany
     {
         return $this->hasMany(InspectionAttempt::class)->latest('id');
+    }
+
+    public function latestAttempt(): HasOne
+    {
+        return $this->hasOne(InspectionAttempt::class)->latestOfMany();
     }
 
     public function referencePhoto(): BelongsTo

@@ -22,4 +22,14 @@ class ShiftPolicy
     {
         return $user->is_active && $user->role === Role::Admin;
     }
+
+    public function submit(User $user, Shift $shift): bool
+    {
+        return $user->is_active && $user->role === Role::User && $shift->worker_id === $user->id;
+    }
+
+    public function review(User $user, Shift $shift): bool
+    {
+        return $this->create($user) && $shift->worker_id !== $user->id;
+    }
 }

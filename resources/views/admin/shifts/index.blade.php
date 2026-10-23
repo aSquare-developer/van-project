@@ -3,6 +3,11 @@
         <div><h1 class="text-3xl font-semibold tracking-tight">Shifts</h1><p class="mt-2 text-slate-500">Each worker receives a separate checklist for their assigned shift.</p></div>
         <a href="{{ route('admin.shifts.create') }}" class="rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white">Assign shift</a>
     </div>
+    <form method="GET" action="{{ route('admin.shifts.index') }}" class="mb-6 flex flex-wrap items-end gap-3">
+        <label class="block text-sm font-medium">Status<select name="status" class="mt-2 block rounded-lg border border-slate-300 bg-white p-3"><option value="">All statuses</option>@foreach(App\Enums\ShiftStatus::cases() as $status)<option value="{{ $status->value }}" @selected(request('status') === $status->value)>{{ $status->label() }}</option>@endforeach</select></label>
+        <button class="rounded-lg border border-slate-300 bg-white px-4 py-3 text-sm">Filter</button>
+        <a href="{{ route('admin.shifts.index', ['status' => 'awaiting_review']) }}" class="px-2 py-3 text-sm underline">Awaiting review ({{ $awaitingCount }})</a>
+    </form>
     <div class="space-y-3">
         @forelse($shifts as $shift)
             <article class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5">

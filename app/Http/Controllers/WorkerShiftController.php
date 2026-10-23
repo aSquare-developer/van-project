@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\CheckStatus;
 use App\Models\Shift;
 use App\Models\ShiftCheck;
+use App\Services\ShiftWorkflow;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
@@ -27,7 +28,7 @@ class WorkerShiftController extends Controller
         return view('shifts.index', compact('shifts'));
     }
 
-    public function show(Shift $shift): View
+    public function show(Shift $shift, ShiftWorkflow $workflow): View
     {
         Gate::authorize('view', $shift);
         $shift->load('checks', 'worker:id,name');
@@ -37,6 +38,8 @@ class WorkerShiftController extends Controller
             'shift' => $shift,
             'requiredCount' => $required->count(),
             'passedCount' => $required->where('status', CheckStatus::Passed)->count(),
+            'assessment' => $workflow->assessment($shift),
+            'transitions' => $shift->transitions()->with('actor:id,name')->latest('id')->paginate(10, ['*'], 'history_page'),
         ]);
     }
 
