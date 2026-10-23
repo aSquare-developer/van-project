@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\VanController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\InspectionPhotoController;
 use App\Http\Controllers\WorkerShiftController;
 use Illuminate\Support\Facades\Route;
 
@@ -25,13 +26,17 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         Route::get('/activity', ActivityLogController::class)->name('activity.index');
         Route::resource('users', UserController::class)->except('show');
         Route::resource('vans', VanController::class)->except(['show', 'destroy']);
-        Route::resource('templates', InspectionTemplateController::class)->except(['show', 'destroy']);
+        Route::resource('templates', InspectionTemplateController::class)->except(['show', 'destroy'])->middlewareFor(['store', 'update'], 'throttle:inspection-uploads');
+        Route::get('/templates/{template}/items/{item}/reference', [InspectionPhotoController::class, 'templateReference'])->scopeBindings()->name('templates.items.reference');
         Route::resource('shifts', ShiftController::class)->only(['index', 'create', 'store', 'show']);
     });
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
     Route::get('/shifts', [WorkerShiftController::class, 'index'])->name('shifts.index');
     Route::get('/shifts/{shift}', [WorkerShiftController::class, 'show'])->name('shifts.show');
     Route::get('/shifts/{shift}/checks/{check}', [WorkerShiftController::class, 'check'])->scopeBindings()->name('shifts.checks.show');
+    Route::post('/shifts/{shift}/checks/{check}/photos', [InspectionPhotoController::class, 'store'])->scopeBindings()->middleware('throttle:inspection-uploads')->name('shifts.checks.photos.store');
+    Route::get('/shifts/{shift}/checks/{check}/attempts/{attempt}/photo', [InspectionPhotoController::class, 'attempt'])->scopeBindings()->name('shifts.checks.attempts.photo');
+    Route::get('/shifts/{shift}/checks/{check}/reference', [InspectionPhotoController::class, 'reference'])->scopeBindings()->name('shifts.checks.reference');
     Route::view('/profile', 'profile')->name('profile.show');
     Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');
 });

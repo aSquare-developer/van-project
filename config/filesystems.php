@@ -30,6 +30,14 @@ return [
 
     'disks' => [
 
+        'inspection-photos' => [
+            'driver' => 'local',
+            'root' => storage_path('app/inspection-photos'),
+            'visibility' => 'private',
+            'serve' => false,
+            'throw' => true,
+        ],
+
         'local' => [
             'driver' => 'local',
             'root' => storage_path('app/private'),
