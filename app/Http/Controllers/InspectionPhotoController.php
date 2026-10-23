@@ -9,6 +9,7 @@ use App\Models\InspectionTemplate;
 use App\Models\InspectionTemplateItem;
 use App\Models\Shift;
 use App\Models\ShiftCheck;
+use App\Services\InspectionAnalysis;
 use App\Services\InspectionPhotoSubmission;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
@@ -17,11 +18,12 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class InspectionPhotoController extends Controller
 {
-    public function store(StoreInspectionPhotoRequest $request, Shift $shift, ShiftCheck $check, InspectionPhotoSubmission $submission): RedirectResponse
+    public function store(StoreInspectionPhotoRequest $request, Shift $shift, ShiftCheck $check, InspectionPhotoSubmission $submission, InspectionAnalysis $analysis): RedirectResponse
     {
-        $submission->submit($request->user(), $check, $request->file('photo'), $request->validated('submission_key'));
+        $attempt = $submission->submit($request->user(), $check, $request->file('photo'), $request->validated('submission_key'));
+        $analysis->enqueue($attempt->id);
 
-        return redirect()->route('shifts.checks.show', [$shift, $check])->with('status', 'Photo received. It has not been analysed yet.');
+        return redirect()->route('shifts.checks.show', [$shift, $check])->with('status', 'Photo received. Open the attempt below to check its analysis status.');
     }
 
     public function attempt(Shift $shift, ShiftCheck $check, InspectionAttempt $attempt): StreamedResponse
