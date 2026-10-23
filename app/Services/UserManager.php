@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\Role;
+use App\Models\Shift;
 use App\Models\User;
 use Closure;
 use Illuminate\Support\Facades\DB;
@@ -110,6 +111,9 @@ class UserManager
             $this->authorizeActor($actor);
             $subject = User::query()->lockForUpdate()->findOrFail($subjectId);
             $this->protectAdministrator($actor, $subject, true, false);
+            if (Shift::query()->where('worker_id', $subject->id)->orWhere('assigned_by', $subject->id)->exists()) {
+                throw ValidationException::withMessages(['user' => 'This account has shift history. Block the account instead of deleting it.']);
+            }
             DB::table('sessions')->where('user_id', $subject->id)->delete();
             DB::table('password_reset_tokens')->where('email', $subject->email)->delete();
             $this->audit->record('user.deleted', $actor->id, $subject->id);
