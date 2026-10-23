@@ -8,6 +8,7 @@
         <div><dt class="text-sm text-slate-500">Template at assignment</dt><dd class="mt-1 break-words font-medium">{{ $shift->template_name }}</dd></div>
         <div><dt class="text-sm text-slate-500">Assigned by</dt><dd class="mt-1 break-words font-medium">{{ $shift->assignedBy->name }}</dd></div>
     </dl>
+    <a href="{{ route('shifts.show', $shift) }}" class="mb-6 inline-block rounded-lg bg-slate-900 px-5 py-3 text-sm font-medium text-white">Open worker checklist →</a>
     <h2 class="mb-4 text-xl font-semibold">Assigned checklist</h2>
     <ol class="space-y-4">
         @foreach($shift->checks as $check)

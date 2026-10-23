@@ -8,6 +8,7 @@ use App\Http\Controllers\Admin\VanController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\WorkerShiftController;
 use Illuminate\Support\Facades\Route;
 
 Route::redirect('/', '/dashboard');
@@ -28,6 +29,9 @@ Route::middleware(['auth', 'active'])->group(function (): void {
         Route::resource('shifts', ShiftController::class)->only(['index', 'create', 'store', 'show']);
     });
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
+    Route::get('/shifts', [WorkerShiftController::class, 'index'])->name('shifts.index');
+    Route::get('/shifts/{shift}', [WorkerShiftController::class, 'show'])->name('shifts.show');
+    Route::get('/shifts/{shift}/checks/{check}', [WorkerShiftController::class, 'check'])->scopeBindings()->name('shifts.checks.show');
     Route::view('/profile', 'profile')->name('profile.show');
     Route::post('/logout', [SessionController::class, 'destroy'])->name('logout');
 });
