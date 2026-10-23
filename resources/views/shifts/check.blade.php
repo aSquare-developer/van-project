@@ -48,7 +48,15 @@
                         @if($attempt->status === 'error')
                             <p class="mt-2 text-sm text-slate-600">Analysis is unavailable. Contact your administrator or submit a new photo when the service is available.</p>
                         @else
-                            <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Confidence: {{ number_format($attempt->confidence * 100, 1) }}%</p>
+                            @if($attempt->vision_provider === 'openai')
+                                @if(!$attempt->automatic_decisions)
+                                    <p class="mt-2 text-sm text-slate-600">Advisory analysis only. This observation does not approve or reject the check.</p>
+                                @endif
+                                <p class="mt-2 text-sm text-slate-600">Observation: {{ $attempt->observed_outcome }}. {{ $attempt->summary }}</p>
+                                <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Model self-assessment: {{ number_format($attempt->confidence * 100, 1) }}% (not measured accuracy)</p>
+                            @else
+                                <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Confidence: {{ number_format($attempt->confidence * 100, 1) }}%</p>
+                            @endif
                         @endif
                     @else
                         <p class="mt-3 text-sm text-slate-600">{{ $attempt->status === 'processing' ? 'Analysis in progress.' : 'Awaiting analysis.' }} No recognition result has been recorded for this photo. Refresh this page to check for a result.</p>

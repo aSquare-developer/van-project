@@ -93,6 +93,7 @@ class InspectionAnalysis
                 'error_code' => $result['error'] ?? null, 'result' => $status->value,
                 'detected_class' => $result['detected_class'] ?? null, 'confidence' => $result['confidence'] ?? null,
                 'boxes' => $result['boxes'] ?? null, 'analysed_at' => now(), 'processing_token' => null, 'retry_at' => null,
+                'observed_outcome' => $result['observed_outcome'] ?? null, 'summary' => $result['summary'] ?? null,
             ])->save();
             $latestId = $check->attempts()->max('id');
             if ((int) $latestId === $attempt->id && in_array($shift->status, [ShiftStatus::Assigned, ShiftStatus::InProgress, ShiftStatus::ReturnedForCheck], true)) {

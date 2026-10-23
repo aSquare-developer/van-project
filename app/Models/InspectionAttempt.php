@@ -20,6 +20,7 @@ class InspectionAttempt extends Model
             'dispatched_at' => 'immutable_datetime', 'started_at' => 'immutable_datetime',
             'retry_at' => 'immutable_datetime', 'analysed_at' => 'immutable_datetime',
             'boxes' => 'array', 'confidence' => 'float', 'confidence_threshold' => 'float',
+            'automatic_decisions' => 'boolean',
         ];
     }
 

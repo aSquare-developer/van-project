@@ -28,7 +28,21 @@ Administrative changes and their audit entries share a transaction. Audit failur
 
 The application audit trail is not tamper-proof against database administrators. Set an appropriate log retention policy and protect database backups.
 
-## Vision service contract v1
+## Vision providers and rollout
+
+The existing queue now routes through `VisionClient` by the provider snapshotted on each attempt. `custom` retains the v1 contract below; `openai` calls the fixed `https://api.openai.com/v1/responses` endpoint directly, without another server or new PHP dependencies. Unknown providers fail closed. Existing records migrate to `custom` and preserve their earlier behavior.
+
+New OpenAI attempts snapshot the configured model, `silicone-holder-v1` prompt and automatic-decision policy. This prompt supports only the registered silicone holder check; adding an arbitrary template title does not add a new recognition capability. Each check needs a versioned criterion and acceptance examples before support is added. Changing model/provider does not reinterpret pending attempts. Old prompt versions must stay implemented or fail with a configuration error, never silently change meaning.
+
+OpenAI receives only the private current photograph and the reference already assigned to the check, labelled separately as base64 image inputs. A reference is mandatory for this first criterion: missing/purged files fail before sending anything. Neither worker instructions nor text detected in images can override the server criterion. The reference identifies the intended holder and never establishes its current stock. The criterion requires a visible holder containing at least one silicone/sealant cartridge; demonstrably empty is absent; hidden, unrelated, blurred or ambiguous is uncertain. The model cannot verify capture location, time, authenticity or whether a worker reused an old photo.
+
+Responses use a strict JSON schema with visibility, outcome, confidence and short summary. The adapter validates types, envelope/model/completion state and size independently, rejects refusals or incomplete output, and forces nonvisible targets to uncertain. Classes are mapped server-side; no bounding boxes are fabricated. Only normalized observation/summary are retained, never raw provider envelopes, image data URLs, tokens or exception text. Summaries are untrusted text and HTML-escaped in the browser. Requests have `store=false`, no tools, disabled redirects, 5-second connect/30-second total timeouts and a 64 KiB response cap. `store=false` does not by itself mean zero provider retention; review the provider data controls before activating private-photo transfer.
+
+**Pilot default:** `VISION_OPENAI_AUTOMATIC_DECISIONS=false`. Observations and explanations are recorded, but checks remain inconclusive. Model-reported confidence is a self-assessment, not measured accuracy. After real-photo validation, explicitly enabling automatic decisions permits present/absent to pass/fail only for new, opted-in attempts at the existing threshold. Disabling the flag also suppresses automatic decisions for queued OpenAI attempts as an operational kill switch; it does not undo previous results. Enabling it never upgrades an earlier advisory attempt. Latest-attempt and closed-shift protections are shared with the custom provider.
+
+Provider reference: [OpenAI vision inputs](https://developers.openai.com/api/docs/guides/images-vision?api-mode=responses) and [Structured Outputs](https://developers.openai.com/api/docs/guides/structured-outputs?api-mode=responses).
+
+## Vision service contract v1 (custom provider)
 
 Laravel sends a server-to-server multipart POST to the configured trusted HTTPS endpoint. Headers: `Authorization: Bearer <server token>`, `Accept: application/json`, `Idempotency-Key: <attempt UUID>`. Fields: `protocol_version=1`, `attempt_id=<same UUID>`, `check_key=silicone_holder`, `model_version=<configured immutable version>`, and binary `image` with its verified JPEG/PNG/WebP MIME type. No public photo URL or worker-supplied endpoint/result is trusted. Redirects are disabled.
 
