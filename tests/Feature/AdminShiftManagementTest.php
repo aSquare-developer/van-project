@@ -57,7 +57,8 @@ class AdminShiftManagementTest extends TestCase
         $this->assertDatabaseHas('vans', ['name' => 'No plate', 'registration' => null]);
         $this->assertDatabaseHas('activity_logs', ['event' => 'van.updated', 'actor_id' => auth()->id()]);
         $entry = ActivityLog::where('event', 'van.created')->firstOrFail();
-        $this->assertSame(['type' => 'vans', 'id' => $van->id], $entry->metadata['resource']);
+        $this->assertSame('vans', $entry->metadata['resource']['type']);
+        $this->assertSame($van->id, $entry->metadata['resource']['id']);
     }
 
     public function test_admin_can_create_edit_reorder_and_archive_templates(): void
@@ -104,7 +105,8 @@ class AdminShiftManagementTest extends TestCase
         $this->put('/admin/templates/'.$template->id, $changed)->assertRedirect('/admin/templates');
         $this->get('/admin/shifts/'.$shift->id)->assertOk()->assertSee('Friday inspection')->assertSee('Silicone holder')->assertDontSee('Changed instructions.');
         $entry = ActivityLog::where('event', 'shift.assigned')->firstOrFail();
-        $this->assertSame(['type' => 'shifts', 'id' => $shift->id], $entry->metadata['resource']);
+        $this->assertSame('shifts', $entry->metadata['resource']['type']);
+        $this->assertSame($shift->id, $entry->metadata['resource']['id']);
         $this->post('/admin/shifts', [...$data, 'worker_id' => User::factory()->create()->id])->assertRedirect();
         $this->assertDatabaseCount('shifts', 2);
         $this->assertDatabaseCount('shift_checks', 3);
