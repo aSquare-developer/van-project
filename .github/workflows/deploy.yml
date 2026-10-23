@@ -1,0 +1,82 @@
+name: Deploy to Zone
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  checks: read
+
+concurrency:
+  group: zone-production
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      DEPLOY_HOST: asquare.ee
+      DEPLOY_USER: virt141509
+      DEPLOY_ROOT: /data02/virt141509/domeenid/www.asquare.ee/van
+      RELEASE_ID: ${{ github.sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Require successful CI for this exact commit
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data } = await github.rest.checks.listForRef({
+              ...context.repo, ref: context.sha, per_page: 100,
+            });
+            for (const name of ['test (8.3)', 'test (8.4)', 'test (8.5)']) {
+              const check = data.check_runs.find(run => run.name === name && run.app.slug === 'github-actions');
+              if (!check || check.conclusion !== 'success') {
+                throw new Error(`${name} must pass on ${context.sha} before deployment. Run this workflow again after CI completes.`);
+              }
+            }
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          extensions: mbstring, pdo_mysql
+          coverage: none
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+      - name: Build production dependencies and assets
+        run: |
+          composer install --no-dev --no-scripts --prefer-dist --no-interaction --optimize-autoloader
+          npm ci --ignore-scripts
+          npm run build
+      - name: Package tracked source with production dependencies
+        run: |
+          stage=$(mktemp -d)
+          git archive HEAD | tar -x -C "$stage"
+          cp -a vendor "$stage/vendor"
+          cp -a public/build "$stage/public/build"
+          tar -czf "$RUNNER_TEMP/van-release.tar.gz" -C "$stage" .
+      - name: Configure SSH identity and trusted server
+        env:
+          DEPLOY_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+          KNOWN_HOSTS: ${{ secrets.SSH_KNOWN_HOSTS }}
+        run: |
+          test -n "$DEPLOY_KEY" || { echo 'Missing SSH_PRIVATE_KEY secret.'; exit 1; }
+          test -n "$KNOWN_HOSTS" || { echo 'Missing SSH_KNOWN_HOSTS secret.'; exit 1; }
+          umask 077
+          printf '%s\n' "$DEPLOY_KEY" > "$RUNNER_TEMP/van_deploy_key"
+          printf '%s\n' "$KNOWN_HOSTS" > "$RUNNER_TEMP/van_known_hosts"
+          ssh-keygen -y -f "$RUNNER_TEMP/van_deploy_key" > /dev/null
+          ssh-keygen -F "$DEPLOY_HOST" -f "$RUNNER_TEMP/van_known_hosts" > /dev/null
+      - name: Upload and deploy
+        run: |
+          ssh_options=(-i "$RUNNER_TEMP/van_deploy_key" -o BatchMode=yes -o IdentitiesOnly=yes -o StrictHostKeyChecking=yes -o "UserKnownHostsFile=$RUNNER_TEMP/van_known_hosts" -o ConnectTimeout=20)
+          remote="$DEPLOY_USER@$DEPLOY_HOST"
+          ssh "${ssh_options[@]}" "$remote" "test -d '$DEPLOY_ROOT' && test ! -L '$DEPLOY_ROOT' && test -f '$DEPLOY_ROOT/.van-project' && test -f '$DEPLOY_ROOT/.env' && test ! -L '$DEPLOY_ROOT/.incoming' && mkdir -p '$DEPLOY_ROOT/.incoming'"
+          scp "${ssh_options[@]}" "$RUNNER_TEMP/van-release.tar.gz" "$remote:$DEPLOY_ROOT/.incoming/$RELEASE_ID.tar.gz"
+          ssh "${ssh_options[@]}" "$remote" "bash -s -- '$DEPLOY_ROOT' '$RELEASE_ID' 'php84-cli'" < .github/scripts/deploy-zone.sh
+      - name: Check public HTTPS health endpoint
+        run: curl --fail --silent --show-error --retry 3 --retry-delay 5 --retry-all-errors https://van.asquare.ee/up > /dev/null

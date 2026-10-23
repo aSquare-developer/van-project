@@ -51,6 +51,11 @@ jobs:
       - run: composer audit --locked
       - name: Check tracked files
         run: python3 .github/scripts/check-tracked-files.py
+      - name: Validate deployment scripts
+        run: |
+          bash -n .github/scripts/deploy-zone.sh
+          shellcheck .github/scripts/deploy-zone.sh
+          python3 .github/scripts/test_deploy_zone.py
       - name: PHP syntax
         run: git ls-files -z '*.php' | xargs -0 -n1 php -l
       - run: vendor/bin/pint --test
