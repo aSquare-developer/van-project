@@ -26,7 +26,7 @@ class CsrfTest extends TestCase
 
     public function test_mutating_routes_reject_missing_or_invalid_csrf_tokens(): void
     {
-        foreach ([['POST', '/login'], ['POST', '/logout'], ['POST', '/forgot-password'], ['POST', '/reset-password'], ['POST', '/admin/users'], ['PUT', '/admin/users/1'], ['DELETE', '/admin/users/1']] as [$method, $uri]) {
+        foreach ([['POST', '/login'], ['POST', '/logout'], ['POST', '/forgot-password'], ['POST', '/reset-password'], ['POST', '/admin/users'], ['PUT', '/admin/users/1'], ['DELETE', '/admin/users/1'], ['POST', '/admin/vans'], ['PUT', '/admin/vans/1'], ['POST', '/admin/templates'], ['PUT', '/admin/templates/1'], ['POST', '/admin/shifts']] as [$method, $uri]) {
             $this->withSession(['_token' => 'expected-token'])->call($method, $uri, ['_token' => 'wrong-token'])->assertStatus(419);
         }
     }
