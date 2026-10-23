@@ -44,8 +44,14 @@ class InspectionPhotoSubmission
                     'check_key' => $check->check_key,
                     'expected_class' => $check->expected_class,
                     'absent_class' => config('inspections.checks.'.$check->check_key.'.absent_class'),
-                    'model_version' => config('inspections.checks.'.$check->check_key.'.model_version'),
+                    'model_version' => config('inspections.vision.provider', 'custom') === 'openai'
+                        ? config('inspections.vision.openai.model')
+                        : config('inspections.checks.'.$check->check_key.'.model_version'),
                     'confidence_threshold' => config('inspections.checks.'.$check->check_key.'.confidence_threshold', 0.8),
+                    'vision_provider' => config('inspections.vision.provider', 'custom'),
+                    'automatic_decisions' => config('inspections.vision.provider', 'custom') === 'custom'
+                        || config('inspections.vision.openai.automatic_decisions', false) === true,
+                    'prompt_version' => config('inspections.vision.provider', 'custom') === 'openai' ? OpenAiVisionClient::PROMPT_VERSION : null,
                 ])->save();
                 $check->forceFill(['status' => CheckStatus::Pending])->save();
                 if ($shift->status !== ShiftStatus::InProgress) {

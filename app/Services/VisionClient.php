@@ -13,6 +13,12 @@ class VisionClient
     /** @return array{error: string, retryable: bool}|array{result: string, detected_class: ?string, confidence: float, boxes: array} */
     public function analyse(InspectionAttempt $attempt): array
     {
+        if ($attempt->vision_provider === 'openai') {
+            return app(OpenAiVisionClient::class)->analyse($attempt);
+        }
+        if ($attempt->vision_provider !== 'custom') {
+            return ['error' => 'configuration_error', 'retryable' => false];
+        }
         $endpoint = config('inspections.vision.endpoint');
         $token = config('inspections.vision.token');
         $url = is_string($endpoint) ? parse_url($endpoint) : false;

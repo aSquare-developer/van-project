@@ -105,7 +105,7 @@ In GitHub repository settings, require the CI `test` matrix checks before mergin
 
 ## Photo analysis service and Zone queue
 
-Set `VISION_ENDPOINT` to the full trusted HTTPS endpoint, `VISION_TOKEN` to its server-only bearer token and `VISION_SILICONE_MODEL_VERSION` to the deployed, immutable model version. No credentials, model or service endpoint are provided by this repository. This is a custom version-1 contract, not a direct Roboflow API adapter: the separate service must implement the contract in architecture.md and can run a Roboflow model internally. Only configure a service authorized to receive these private photographs. Disable request/response body and authorization-header logging there too.
+For `VISION_PROVIDER=custom` (the backwards-compatible default), set `VISION_ENDPOINT` to the full trusted HTTPS endpoint, `VISION_TOKEN` to its server-only bearer token and `VISION_SILICONE_MODEL_VERSION` to the deployed, immutable model version. No credentials, model or service endpoint are provided by this repository. This is a custom version-1 contract, not a direct Roboflow API adapter: the separate service must implement the contract in architecture.md and can run a Roboflow model internally. Only configure a service authorized to receive these private photographs. Disable request/response body and authorization-header logging there too.
 
 Rebuild config cache after changing server configuration. New attempts snapshot the check key, expected/empty classes, confidence threshold and model version. Changing configuration does not silently reinterpret old attempts; submit a new photo for a new model/configuration. Missing configuration records an analysis error, never a fabricated recognition result.
 
@@ -122,3 +122,28 @@ Capture cron output in restricted hosting logs and monitor it; do not discard fa
 The durable attempt row acts as an outbox: dispatch failure does not roll back an already uploaded image. A two-minute lease recovers undelivered jobs and crashed workers. Duplicate deliveries cannot claim an active lease; request idempotency uses the same attempt UUID across at most three service calls. The service must persist/deduplicate that UUID together with image hash/check/model, rejecting reuse for different inputs. Transient connection/429/5xx failures wait at least 30 then 60 seconds and are requeued by the scheduler; other HTTP failures and invalid contracts are terminal. Do not use `queue:retry all` as the application retry mechanism. A new photo creates a new independent attempt.
 
 Verify on the server: one stocked holder, one empty holder, one unclear image, service unavailable, repeated delivery and a new photo overtaking an old result. Confirm the worker drains the queue and no bearer token or raw service response appears in application/failed-job logs. Automated tests use HTTP fakes only; real endpoint/model acceptance and cron execution remain deployment acceptance checks (#25). No cron or service is activated automatically by merging.
+
+
+## Direct OpenAI provider: configuration and acceptance
+
+This adapter removes the need to host a separate v1 service for the pilot. It does not train a detector and is not live camera inference. Configure privately on Zone, never in GitHub issues, browser forms or frontend JavaScript:
+
+```dotenv
+VISION_PROVIDER=openai
+OPENAI_API_KEY=<dedicated-project-key>
+VISION_OPENAI_MODEL=<immutable-model-snapshot-supporting-images-and-structured-outputs>
+VISION_OPENAI_AUTOMATIC_DECISIONS=false
+```
+
+There is deliberately no default model alias. Choose an available model snapshot with image input and strict JSON Schema support in Responses; record the exact ID used for acceptance. `VISION_ENDPOINT`, `VISION_TOKEN` and `VISION_SILICONE_MODEL_VERSION` are used only by custom attempts. Keep those credentials available until previously queued custom attempts finish. New OpenAI attempts use `VISION_OPENAI_MODEL` as their model version. Configure an appropriate PHP memory limit for two maximum-size images plus JSON/base64 encoding; 256M is a practical starting point to verify on Zone.
+
+1. Merge/deploy after CI, apply the additive migration, add a reference photograph to the silicone-holder template and assign a new shift. Already assigned checks retain their old references; checks without one cannot use this adapter.
+2. Set a dedicated provider project budget/alerts and verify its actual spending controls. Each attempt makes at most three requests, but an interrupted request may still be billed; the idempotency header is not a guarantee of provider-side billing deduplication. Verify upload throttling and expected daily photograph volume before wider use. `max_output_tokens=800` bounds generated output, not image-input cost. Do not log HTTP bodies/authorization headers, including in external observability tooling.
+3. Run `php84-cli artisan config:cache`, then configure the existing scheduler and database inspection worker above. No extra public photo route or Node/Python service is required. Do not transfer real private photographs until provider data processing/retention settings meet your requirements; `store=false` disables stored Responses state, not all possible abuse-monitoring retention.
+4. Submit a small authorized pilot set. Verify private-photo access, queue processing, normalized history, escaped explanation and advisory/inconclusive behavior in the UI. Verify a missing key, bad model, missing reference, 401, 429 and unavailable network never produce a pass or an empty-holder finding. Check real response latency against the 30-second HTTP timeout.
+5. Build a human-labelled set covering empty holder, one cartridge, several cartridges, a cartridge outside the holder, similar objects, obstructed/missing holder, wrong area, dim light and varying angles/devices. Include at least 10 independent photos per case as a starting pilot set, keep a held-out set and measure false acceptance, false rejection and inconclusive rate. These numbers are engineering starting points, not an accuracy guarantee. Agree the acceptable false-acceptance rate before promoting; a reported 0.95 confidence alone is insufficient.
+6. Keep automatic decisions disabled until the held-out results justify them. If accepted, set `VISION_OPENAI_AUTOMATIC_DECISIONS=true`, rebuild config cache and submit NEW attempts; advisory records stay advisory. Disable the flag/rebuild config cache to suppress new automatic outcomes during an incident. Existing finalized results are not retroactively changed. To change provider, set `VISION_PROVIDER=custom` and configure the v1 service; queued OpenAI attempts keep their provider and still require their key.
+
+Before rolling back to an application version without the OpenAI adapter, stop the inspection worker and resolve pending OpenAI attempts; the older client cannot interpret their provider snapshots. Keep the additive schema and attempt history intact.
+
+Implementation and activation are separate: no production API key, paid request, remote provider project, cron job or real-photo validation is provisioned by the code change. Continue tracking live acceptance under #25 and provider integration under #31. If general vision fails the held-out acceptance threshold, collect/label a dedicated dataset and connect a trained detector through the custom-v1 contract rather than weakening the pass criteria.
