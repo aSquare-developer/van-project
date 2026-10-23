@@ -41,7 +41,18 @@
                 <article class="rounded-xl border border-slate-200 bg-white p-5">
                     <h3 class="text-sm font-semibold">Photo received · Attempt #{{ $attempt->id }}</h3>
                     <time class="mt-2 block text-xs text-slate-500" datetime="{{ $attempt->created_at->toIso8601String() }}">{{ $attempt->created_at->timezone(config('app.timezone'))->format('d M Y H:i:s') }}</time>
-                    <p class="mt-3 text-sm text-slate-600">Awaiting analysis. No recognition result has been recorded for this photo.</p>
+                    @if($attempt->result)
+                        @php($attemptResult = App\Enums\CheckStatus::from($attempt->result))
+                        <div class="mt-3"><x-status-badge :status="$attemptResult" /></div>
+                        <p class="mt-3 text-sm text-slate-600">{{ $attemptResult->description() }}</p>
+                        @if($attempt->status === 'error')
+                            <p class="mt-2 text-sm text-slate-600">Analysis is unavailable. Contact your administrator or submit a new photo when the service is available.</p>
+                        @else
+                            <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Confidence: {{ number_format($attempt->confidence * 100, 1) }}%</p>
+                        @endif
+                    @else
+                        <p class="mt-3 text-sm text-slate-600">{{ $attempt->status === 'processing' ? 'Analysis in progress.' : 'Awaiting analysis.' }} No recognition result has been recorded for this photo. Refresh this page to check for a result.</p>
+                    @endif
                     @if($attempt->photo->purged_at)
                         <p class="mt-3 text-sm text-slate-500">Photo removed under the retention policy. The attempt record is preserved.</p>
                     @else

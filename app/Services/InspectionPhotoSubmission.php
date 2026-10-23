@@ -41,6 +41,11 @@ class InspectionPhotoSubmission
                 $attempt->forceFill([
                     'shift_check_id' => $check->id, 'inspection_photo_id' => $photo->id,
                     'submission_key' => $submissionKey, 'status' => 'uploaded',
+                    'check_key' => $check->check_key,
+                    'expected_class' => $check->expected_class,
+                    'absent_class' => config('inspections.checks.'.$check->check_key.'.absent_class'),
+                    'model_version' => config('inspections.checks.'.$check->check_key.'.model_version'),
+                    'confidence_threshold' => config('inspections.checks.'.$check->check_key.'.confidence_threshold', 0.8),
                 ])->save();
                 $check->forceFill(['status' => CheckStatus::Pending])->save();
                 if ($shift->status !== ShiftStatus::InProgress) {

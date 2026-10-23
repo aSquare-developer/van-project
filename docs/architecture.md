@@ -28,6 +28,29 @@ Administrative changes and their audit entries share a transaction. Audit failur
 
 The application audit trail is not tamper-proof against database administrators. Set an appropriate log retention policy and protect database backups.
 
+## Vision service contract v1
+
+Laravel sends a server-to-server multipart POST to the configured trusted HTTPS endpoint. Headers: `Authorization: Bearer <server token>`, `Accept: application/json`, `Idempotency-Key: <attempt UUID>`. Fields: `protocol_version=1`, `attempt_id=<same UUID>`, `check_key=silicone_holder`, `model_version=<configured immutable version>`, and binary `image` with its verified JPEG/PNG/WebP MIME type. No public photo URL or worker-supplied endpoint/result is trusted. Redirects are disabled.
+
+Return HTTP 200 with JSON (maximum 64 KiB):
+
+```json
+{
+  "protocol_version": 1,
+  "attempt_id": "<same UUID>",
+  "check_key": "silicone_holder",
+  "model_version": "<same immutable version>",
+  "outcome": "present",
+  "class": "holder_stocked",
+  "confidence": 0.95,
+  "boxes": [{"x": 0.1, "y": 0.2, "width": 0.3, "height": 0.4}]
+}
+```
+
+For `absent`, class must be `holder_empty`; for `uncertain`, class must be null. Confidence is 0–1, with a server-side threshold of 0.8 for this check. Below threshold, both present/absent become inconclusive. The service must use uncertain when the target holder/area cannot be located or assessed; lack of a stocked-object detection alone is not evidence of an empty holder. Configure/train these classes accordingly before real acceptance. Boxes are optional detections represented by a required list (empty is valid), at most 100, using normalized top-left x/y and positive width/height inside image bounds. Unknown response fields are ignored and never persisted. Mismatched attempt/check/model/class, malformed JSON or invalid boxes are infrastructure errors, not missing objects.
+
+An attempt preserves normalized result, class, confidence, boxes, model version, timestamps and sanitized error code. The queue contains only the attempt ID; private bytes and bearer tokens stay out of the payload. No raw provider body is retained. Result/audit/check changes commit together. Only the newest attempt can change an editable shift check, and a processing-token comparison prevents an expired worker from committing after a replacement claim. Closed or under-review shifts are never silently changed by late analysis. The browser shows attempt status and confidence; refreshing retrieves the latest server state. No live camera inference is implemented.
+
 ## Verification
 
 See [security.md](security.md) for SEC-001–SEC-007 and [deployment.md](deployment.md) for deployment. CI tests supported PHP versions against MySQL 8.4, including a two-process race test; SQLite local tests skip that one test.

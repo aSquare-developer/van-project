@@ -62,7 +62,7 @@ The password is entered at a hidden terminal prompt. Verify login, role restrict
 4. Create the dedicated database and configure credentials. Use a deployment database principal for migrations and, if available, a restricted runtime principal for normal operation.
 5. Run `php artisan migrate --force` after taking a database backup. Do not run reset/fresh commands on production data.
 6. Run `php artisan admin:create --name="Administrator" --email="your-email@example.com"` interactively. Enter and confirm a unique strong password at the hidden prompts. The command refuses when an active admin already exists. No default credentials or accounts are seeded.
-7. Run `php artisan config:cache`, `php artisan route:cache` and `php artisan view:cache`. Restart PHP workers if needed. There are no scheduled tasks or queue workers required for the current synchronous reset email flow.
+7. Run `php artisan config:cache`, `php artisan route:cache` and `php artisan view:cache`. Restart PHP workers if needed. Password-reset email remains synchronous; photo analysis requires the scheduler and inspection queue worker below.
 8. Verify `/up`, login/logout, user creation, each role, blocking an already signed-in account and password reset through your real mailbox. Confirm HTTP redirects to HTTPS, no debug output, and that `/.env` and `/vendor/` cannot be served.
 
 ## Production environment
@@ -102,3 +102,23 @@ For an application-only rollback, restore the preceding tested release. Database
 Monitor application errors, SMTP failures, database availability and disk use. Set an audit-log retention policy before long-term use; there is deliberately no web UI for deleting audit records. Configure session cleanup through the database session driver's garbage collection, and retain centralized server logs according to your operational policy.
 
 In GitHub repository settings, require the CI `test` matrix checks before merging and restrict direct pushes to main. These repository administration settings are not changed by this implementation. Keep provider/server credentials in the hosting secret store, never in issue or PR comments.
+
+## Photo analysis service and Zone queue
+
+Set `VISION_ENDPOINT` to the full trusted HTTPS endpoint, `VISION_TOKEN` to its server-only bearer token and `VISION_SILICONE_MODEL_VERSION` to the deployed, immutable model version. No credentials, model or service endpoint are provided by this repository. This is a custom version-1 contract, not a direct Roboflow API adapter: the separate service must implement the contract in architecture.md and can run a Roboflow model internally. Only configure a service authorized to receive these private photographs. Disable request/response body and authorization-header logging there too.
+
+Rebuild config cache after changing server configuration. New attempts snapshot the check key, expected/empty classes, confidence threshold and model version. Changing configuration does not silently reinterpret old attempts; submit a new photo for a new model/configuration. Missing configuration records an analysis error, never a fabricated recognition result.
+
+Analysis uses the **database** queue connection and `inspections` queue regardless of the default queue driver. Keep `DB_QUEUE_CONNECTION` unset so job inserts and the dispatch marker share the application's transaction; keep `queue.connections.database.after_commit=false` and `DB_QUEUE_RETRY_AFTER=90` (or greater than the 50-second job timeout). Use the existing jobs/failed_jobs migrations. Check `php84-cli -m` for pcntl before relying on worker-enforced timeouts; HTTP also has its own 5-second connection and 30-second total timeout.
+
+After deploying and configuring the service, add a once-per-minute Zone cron task with working directory `/data02/virt141509/domeenid/www.asquare.ee/van/current`. Use the host-resolved absolute path to `php84-cli` if cron does not provide it in PATH:
+
+```sh
+php84-cli artisan schedule:run && php84-cli artisan queue:work database --queue=inspections --stop-when-empty --max-time=50 --timeout=50 --tries=1 --sleep=1
+```
+
+Capture cron output in restricted hosting logs and monitor it; do not discard failures. The scheduler queues at most 100 pending/recoverable attempts per minute. The short-lived worker processes committed jobs and reloads current code on its next invocation, so no permanent daemon is required. Backlogs require more worker capacity. A dedicated supervised worker is also possible; restart it on each release.
+
+The durable attempt row acts as an outbox: dispatch failure does not roll back an already uploaded image. A two-minute lease recovers undelivered jobs and crashed workers. Duplicate deliveries cannot claim an active lease; request idempotency uses the same attempt UUID across at most three service calls. The service must persist/deduplicate that UUID together with image hash/check/model, rejecting reuse for different inputs. Transient connection/429/5xx failures wait at least 30 then 60 seconds and are requeued by the scheduler; other HTTP failures and invalid contracts are terminal. Do not use `queue:retry all` as the application retry mechanism. A new photo creates a new independent attempt.
+
+Verify on the server: one stocked holder, one empty holder, one unclear image, service unavailable, repeated delivery and a new photo overtaking an old result. Confirm the worker drains the queue and no bearer token or raw service response appears in application/failed-job logs. Automated tests use HTTP fakes only; real endpoint/model acceptance and cron execution remain deployment acceptance checks (#25). No cron or service is activated automatically by merging.
