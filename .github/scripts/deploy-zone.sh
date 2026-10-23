@@ -41,6 +41,7 @@ release="$project_root/releases/$release_id"
 mkdir -p "$project_root/releases" "$project_root/storage"
 mkdir "$release"
 tar -xzf "$archive" -C "$release"
+chmod 755 "$release"
 [[ -f "$release/artisan" && -f "$release/vendor/autoload.php" && -f "$release/public/build/manifest.json" ]] || fail 'Incomplete release archive.'
 [[ ! -e "$release/.env" && ! -L "$release/.env" ]] || fail 'Release archives must not contain .env.'
 [[ -d "$release/storage" && ! -L "$release/storage" ]] || fail 'Invalid storage template.'

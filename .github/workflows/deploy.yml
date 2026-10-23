@@ -55,6 +55,7 @@ jobs:
       - name: Package tracked source with production dependencies
         run: |
           stage=$(mktemp -d)
+          chmod 755 "$stage"
           git archive HEAD | tar -x -C "$stage"
           cp -a vendor "$stage/vendor"
           cp -a public/build "$stage/public/build"
