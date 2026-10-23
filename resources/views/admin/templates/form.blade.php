@@ -1,7 +1,7 @@
 <x-layout :title="$template->exists ? 'Edit template' : 'Create template'">
     <h1 class="mb-2 text-3xl font-semibold">{{ $template->exists ? 'Edit template' : 'Create template' }}</h1>
     <p class="mb-8 text-slate-500">Changes apply to future assignments. Existing shift checklists keep their original instructions.</p>
-    <form data-checklist-editor method="POST" action="{{ $template->exists ? route('admin.templates.update', $template) : route('admin.templates.store') }}" class="max-w-3xl space-y-6">
+    <form data-checklist-editor method="POST" enctype="multipart/form-data" action="{{ $template->exists ? route('admin.templates.update', $template) : route('admin.templates.store') }}" class="max-w-3xl space-y-6">
         @csrf
         @if($template->exists) @method('PUT') @endif
         <div class="space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">

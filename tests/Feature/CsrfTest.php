@@ -35,4 +35,9 @@ class CsrfTest extends TestCase
     {
         $this->withSession(['_token' => 'expected-token'])->post('/login', ['_token' => 'expected-token'])->assertSessionHasErrors(['email', 'password']);
     }
+
+    public function test_photo_upload_rejects_invalid_csrf_token(): void
+    {
+        $this->withSession(['_token' => 'expected-token'])->post('/shifts/1/checks/1/photos', ['_token' => 'wrong-token'])->assertStatus(419);
+    }
 }

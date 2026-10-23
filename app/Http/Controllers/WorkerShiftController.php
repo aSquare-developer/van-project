@@ -45,6 +45,9 @@ class WorkerShiftController extends Controller
         Gate::authorize('view', $shift);
         Gate::authorize('view', $check);
 
-        return view('shifts.check', compact('shift', 'check'));
+        $check->load('referencePhoto');
+        $attempts = $check->attempts()->with('photo')->paginate(10);
+
+        return view('shifts.check', compact('shift', 'check', 'attempts'));
     }
 }

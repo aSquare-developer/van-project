@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['position', 'title', 'instructions', 'check_key', 'expected_class', 'is_required'])]
+#[Fillable(['position', 'title', 'instructions', 'check_key', 'expected_class', 'is_required', 'reference_photo_id'])]
 class InspectionTemplateItem extends Model
 {
     /** @use HasFactory<InspectionTemplateItemFactory> */
@@ -22,5 +22,10 @@ class InspectionTemplateItem extends Model
     public function template(): BelongsTo
     {
         return $this->belongsTo(InspectionTemplate::class, 'inspection_template_id');
+    }
+
+    public function referencePhoto(): BelongsTo
+    {
+        return $this->belongsTo(InspectionPhoto::class, 'reference_photo_id');
     }
 }

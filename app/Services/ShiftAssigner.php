@@ -68,6 +68,7 @@ class ShiftAssigner
                     'check_key' => $item->check_key,
                     'expected_class' => $item->expected_class,
                     'is_required' => $item->is_required,
+                    'reference_photo_id' => $item->reference_photo_id,
                     'status' => CheckStatus::Pending,
                 ])->save();
             }

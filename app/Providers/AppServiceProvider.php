@@ -42,5 +42,9 @@ class AppServiceProvider extends ServiceProvider
 
         ResetPassword::createUrlUsing(fn (object $user, string $token): string => rtrim(config('app.url'), '/').'/reset-password/'.$token.'?email='.urlencode($user->email)
         );
+        RateLimiter::for('inspection-uploads', fn (Request $request) => [
+            Limit::perMinute(10)->by('inspection-minute|'.$request->user()->id),
+            Limit::perHour(60)->by('inspection-hour|'.$request->user()->id),
+        ]);
     }
 }
