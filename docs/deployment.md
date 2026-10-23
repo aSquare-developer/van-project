@@ -1,5 +1,52 @@
 # Deployment
 
+## Zone shared hosting setup
+
+Deployment target: `virt141509@asquare.ee`, root `/data02/virt141509/domeenid/www.asquare.ee/van`.
+Set the `van.asquare.ee` document root to `/data02/virt141509/domeenid/www.asquare.ee/van/public` and enable HTTPS and PHP 8.4 for that host. The workflow uses Zone's explicit `php84-cli` command, so it does not change the PHP version of the main domain or other sites.
+
+The layout is:
+
+```text
+van/.env                 server-only production configuration
+van/.van-project         marker containing asquare/van-project
+van/storage/             persistent application data
+van/releases/<release>/  source, vendor and compiled frontend
+van/current              symlink to the active release
+van/public               symlink to current/public
+```
+
+Before the first run, create the marker in the confirmed empty project directory:
+
+```sh
+cd /data02/virt141509/domeenid/www.asquare.ee/van
+printf '%s\n' 'asquare/van-project' > .van-project
+```
+
+Create the production `.env` in that same directory using the settings below. Generate its APP_KEY once with `php84-cli -r 'echo "base64:".base64_encode(random_bytes(32)).PHP_EOL;'` and put the result in the file. Keep it private and never replace it during updates. Set `.env` permissions to 600. Configure a dedicated MySQL database, database sessions with encryption and an SMTP sender before activating the site. The workflow refuses missing or development configuration without publishing the new release.
+
+Repository Actions secrets:
+
+| Name | Value |
+| --- | --- |
+| SSH_PRIVATE_KEY | The existing dedicated van-project private key |
+| SSH_KNOWN_HOSTS | Trusted OpenSSH known_hosts entry for asquare.ee |
+
+After verifying the host fingerprint against Zone's server-key fingerprints, copy the existing trusted entry on your Mac with `ssh-keygen -F asquare.ee | pbcopy`. Store that output in SSH_KNOWN_HOSTS. The workflow uses strict host-key verification and never fetches and trusts a new key automatically.
+
+Merge only after CI passes, then open **Actions → Deploy to Zone → Run workflow → main**. Deployment is manual; merging a PR does not publish it. The workflow checks the three successful PHP CI jobs for the exact main commit, builds locked dependencies/assets and sends a new archive over SSH. The server keeps `.env` and `storage` outside releases, locks against concurrent deploys, briefly enters maintenance mode for migrations and switches the `current` symlink after caches compile. The final check requests the public HTTPS `/up` endpoint.
+
+No database rollback or deletion of old releases is automatic. A failed migration leaves the previous code selected and attempts to exit maintenance, but database changes can still require manual recovery. Take a database backup before updates and review schema compatibility. A failed public health check after activation requires checking DNS, TLS, document root and the application; it does not automatically revert the database or code. Uploaded archives and old releases are retained for inspection; remove selected old releases after verifying the new version and disk use.
+
+After the first successful deployment:
+
+```sh
+cd /data02/virt141509/domeenid/www.asquare.ee/van/current
+php84-cli artisan admin:create
+```
+
+The password is entered at a hidden terminal prompt. Verify login, role restrictions, blocking and password reset through your real email provider before putting the panel into use.
+
 ## Requirements
 
 - A currently patched PHP 8.3, 8.4 or 8.5 with ctype, curl, dom, fileinfo, filter, hash, mbstring, openssl, PDO/pdo_mysql, session, tokenizer, xml and zip.
