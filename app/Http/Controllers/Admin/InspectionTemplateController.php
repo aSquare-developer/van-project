@@ -6,13 +6,24 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveInspectionTemplateRequest;
 use App\Models\InspectionTemplate;
 use App\Services\InspectionCatalog;
+use App\Services\ResourceDeletion;
 use App\Services\VisionCatalog;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class InspectionTemplateController extends Controller
 {
+    public function destroy(Request $request, InspectionTemplate $template, ResourceDeletion $deletion): RedirectResponse
+    {
+        Gate::authorize('delete', $template);
+        $request->validate(['confirmed' => ['required', 'accepted']]);
+        $deletion->delete($request->user(), $template);
+
+        return redirect()->route('admin.templates.index')->with('status', 'Inspection template deleted. Saved inspection history is retained.');
+    }
+
     public function index(): View
     {
         Gate::authorize('viewAny', InspectionTemplate::class);

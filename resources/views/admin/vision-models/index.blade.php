@@ -6,6 +6,7 @@
         @forelse($models as $model)
             <article class="rounded-xl border border-slate-200 bg-white p-5">
                 <div class="flex flex-wrap items-start justify-between gap-3"><div><h2 class="text-lg font-semibold">{{ $model->name }}</h2><p class="mt-1 text-sm capitalize text-slate-500">{{ $model->status }} · revision {{ $model->latestRevision?->version }}</p></div><a class="rounded border border-slate-300 px-4 py-2 text-sm" href="{{ route('admin.vision-models.edit', $model) }}">Edit model</a></div>
+                <div class="mt-4"><x-delete-resource :action="route('admin.vision-models.destroy', $model)" label="model" :name="$model->name" message="Removes this model from this application's catalog. Existing assignments retain their settings. The model in Roboflow is unaffected." /></div>
                 @if($model->latestRevision)
                     @php($settings = $model->latestRevision->settings)
                     <p class="mt-4 break-all text-sm text-slate-600">{{ $settings['model_id'] }}</p>

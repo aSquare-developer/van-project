@@ -48,4 +48,11 @@ class CsrfTest extends TestCase
             $this->withSession(['_token' => 'expected-token'])->post($path, ['_token' => 'wrong-token'])->assertStatus(419);
         }
     }
+
+    public function test_resource_deletion_requires_csrf_tokens(): void
+    {
+        foreach (['vans', 'shifts', 'templates', 'vision-models'] as $resource) {
+            $this->withSession(['_token' => 'expected-token'])->delete('/admin/'.$resource.'/1', ['confirmed' => '1'])->assertStatus(419);
+        }
+    }
 }

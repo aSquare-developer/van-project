@@ -5,13 +5,24 @@ namespace App\Http\Controllers\Admin;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveVisionModelRequest;
 use App\Models\VisionModel;
+use App\Services\ResourceDeletion;
 use App\Services\VisionCatalog;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class VisionModelController extends Controller
 {
+    public function destroy(Request $request, VisionModel $visionModel, ResourceDeletion $deletion): RedirectResponse
+    {
+        Gate::authorize('delete', $visionModel);
+        $request->validate(['confirmed' => ['required', 'accepted']]);
+        $deletion->delete($request->user(), $visionModel);
+
+        return redirect()->route('admin.vision-models.index')->with('status', 'Vision model deleted. Saved inspection history is retained.');
+    }
+
     public function index(): View
     {
         Gate::authorize('viewAny', VisionModel::class);

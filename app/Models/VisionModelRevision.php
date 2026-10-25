@@ -30,6 +30,6 @@ class VisionModelRevision extends Model
 
     public function model(): BelongsTo
     {
-        return $this->belongsTo(VisionModel::class, 'vision_model_id');
+        return $this->belongsTo(VisionModel::class, 'vision_model_id')->withTrashed();
     }
 }

@@ -6,12 +6,23 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveVanRequest;
 use App\Models\Van;
 use App\Services\InspectionCatalog;
+use App\Services\ResourceDeletion;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
 
 class VanController extends Controller
 {
+    public function destroy(Request $request, Van $van, ResourceDeletion $deletion): RedirectResponse
+    {
+        Gate::authorize('delete', $van);
+        $request->validate(['confirmed' => ['required', 'accepted']]);
+        $deletion->delete($request->user(), $van);
+
+        return redirect()->route('admin.vans.index')->with('status', 'Van deleted. Saved inspection history is retained.');
+    }
+
     public function index(): View
     {
         Gate::authorize('viewAny', Van::class);

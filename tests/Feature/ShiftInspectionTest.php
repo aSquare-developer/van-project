@@ -105,7 +105,7 @@ class ShiftInspectionTest extends TestCase
             }
             $this->assertSame($role === Role::Admin, Gate::forUser($actor)->allows('update', $van));
             $this->assertSame($role === Role::Admin, Gate::forUser($actor)->allows('update', $template));
-            $this->assertFalse(Gate::forUser($actor)->allows('delete', $van));
+            $this->assertSame($role === Role::Admin, Gate::forUser($actor)->allows('delete', $van));
         }
         $admin = User::factory()->create(['role' => Role::Admin, 'is_active' => false]);
         $this->assertFalse(Gate::forUser($admin)->allows('create', Shift::class));
@@ -229,6 +229,6 @@ class ShiftInspectionTest extends TestCase
     {
         $shift = Shift::factory()->create();
         $this->expectException(QueryException::class);
-        $shift->van->delete();
+        $shift->van->forceDelete();
     }
 }

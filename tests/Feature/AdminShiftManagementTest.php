@@ -244,8 +244,8 @@ class AdminShiftManagementTest extends TestCase
         $admin = User::factory()->create(['role' => Role::Admin]);
         $this->signIn($admin)->post('/admin/templates', $this->templateData(['name' => '<script>alert(1)</script>']))->assertRedirect();
         $this->get('/admin/templates')->assertSee('&lt;script&gt;alert(1)&lt;/script&gt;', false)->assertDontSee('<script>alert(1)</script>', false);
-        $this->delete('/admin/templates/'.InspectionTemplate::firstOrFail()->id)->assertMethodNotAllowed();
-        $this->delete('/admin/vans/1')->assertMethodNotAllowed();
+        $this->delete('/admin/templates/'.InspectionTemplate::firstOrFail()->id)->assertSessionHasErrors('confirmed');
+        $this->delete('/admin/vans/'.Van::factory()->create()->id)->assertSessionHasErrors('confirmed');
         $this->get('/dashboard')->assertSee('href="'.route('admin.vans.index').'"', false)->assertSee('href="'.route('admin.templates.index').'"', false)->assertSee('href="'.route('admin.shifts.index').'"', false);
     }
 }

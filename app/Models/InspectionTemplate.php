@@ -7,12 +7,15 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 #[Fillable(['name', 'description', 'is_active'])]
 class InspectionTemplate extends Model
 {
     /** @use HasFactory<InspectionTemplateFactory> */
     use HasFactory;
+
+    use SoftDeletes;
 
     protected function casts(): array
     {
