@@ -13,7 +13,7 @@ use Throwable;
 
 class InspectionCatalog
 {
-    public function __construct(private AuditLogger $audit, private InspectionPhotoStore $photos) {}
+    public function __construct(private AuditLogger $audit, private InspectionPhotoStore $photos, private VisionCatalog $vision) {}
 
     private function synchronized(User $actor, Closure $operation): mixed
     {
@@ -56,14 +56,11 @@ class InspectionCatalog
                 ])->save();
                 $record->items()->delete();
                 foreach (array_values($data['items']) as $index => $item) {
-                    $definition = config('inspections.checks.'.$item['check_key']);
-                    if (! is_array($definition) || empty($definition['expected_class'])) {
-                        throw ValidationException::withMessages(['items' => 'Select a supported analysis check.']);
-                    }
                     $oldItem = ! empty($item['id']) ? $oldItems->get($item['id']) : null;
                     if (! empty($item['id']) && ! $oldItem) {
                         throw ValidationException::withMessages(['items' => 'An item does not belong to this template. Reload the form.']);
                     }
+                    $definition = $this->vision->definition($item['check_key'], $oldItem);
                     $referenceId = ! empty($item['remove_reference_photo']) ? null : $oldItem?->reference_photo_id;
                     if (! empty($item['reference_photo'])) {
                         $photo = $this->photos->store($actor, $item['reference_photo'], 'reference', 'items.'.$index.'.reference_photo');
@@ -73,6 +70,7 @@ class InspectionCatalog
                     $record->items()->create([
                         'position' => $index + 1, 'title' => $item['title'], 'instructions' => $item['instructions'],
                         'check_key' => $item['check_key'], 'expected_class' => $definition['expected_class'],
+                        'vision_model_revision_id' => $definition['revision_id'] ?? null,
                         'is_required' => $item['is_required'], 'reference_photo_id' => $referenceId,
                     ]);
                 }

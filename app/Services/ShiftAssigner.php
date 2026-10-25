@@ -16,7 +16,7 @@ use Illuminate\Validation\ValidationException;
 
 class ShiftAssigner
 {
-    public function __construct(private AuditLogger $audit) {}
+    public function __construct(private AuditLogger $audit, private VisionCatalog $vision) {}
 
     public function assign(User $actor, array $data): Shift
     {
@@ -47,8 +47,10 @@ class ShiftAssigner
             if ($items->where('is_required', true)->isEmpty()) {
                 throw ValidationException::withMessages(['inspection_template_id' => 'The template must contain at least one required item.']);
             }
+            $definitions = [];
             foreach ($items as $item) {
-                $definition = config('inspections.checks.'.$item->check_key);
+                $definition = $this->vision->definition($item->check_key);
+                $definitions[$item->id] = $definition;
                 if (! is_array($definition) || ($definition['expected_class'] ?? null) !== $item->expected_class) {
                     throw ValidationException::withMessages(['inspection_template_id' => 'The template contains an unsupported analysis check.']);
                 }
@@ -73,6 +75,7 @@ class ShiftAssigner
                     'is_required' => $item->is_required,
                     'reference_photo_id' => $item->reference_photo_id,
                     'status' => CheckStatus::Pending,
+                    'analysis_config' => $definitions[$item->id],
                 ])->save();
             }
             $this->audit->record('shift.assigned', $actor->id, $worker->id, resource: $shift);

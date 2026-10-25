@@ -46,6 +46,8 @@ jobs:
         with:
           node-version: '24'
           cache: npm
+      - name: Prepare test environment
+        run: cp .env.example .env
       - run: composer install --no-interaction --prefer-dist
       - run: composer validate --strict
       - run: composer audit --locked
@@ -63,7 +65,7 @@ jobs:
       - run: npm audit
       - run: npm run build
       - run: php artisan migrate --force
-      - run: php artisan test
+      - run: php artisan test --display-warnings --fail-on-warning
       - run: php artisan config:cache
       - run: php artisan route:cache
       - run: php artisan view:cache

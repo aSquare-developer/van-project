@@ -17,7 +17,7 @@ class ShiftCheck extends Model
 
     protected function casts(): array
     {
-        return ['is_required' => 'boolean', 'position' => 'integer', 'status' => CheckStatus::class];
+        return ['is_required' => 'boolean', 'position' => 'integer', 'status' => CheckStatus::class, 'analysis_config' => 'array'];
     }
 
     public function shift(): BelongsTo

@@ -13,6 +13,13 @@ class VisionClient
     /** @return array{error: string, retryable: bool}|array{result: string, detected_class: ?string, confidence: float, boxes: array} */
     public function analyse(InspectionAttempt $attempt): array
     {
+        $provider = $attempt->analysis_config['provider'] ?? 'custom';
+        if ($provider === 'roboflow') {
+            return app(RoboflowVisionClient::class)->analyse($attempt);
+        }
+        if ($provider !== 'custom') {
+            return ['error' => 'configuration_error', 'retryable' => false];
+        }
         $endpoint = config('inspections.vision.endpoint');
         $token = config('inspections.vision.token');
         $url = is_string($endpoint) ? parse_url($endpoint) : false;

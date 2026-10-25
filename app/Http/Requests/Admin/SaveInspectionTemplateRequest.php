@@ -4,6 +4,7 @@ namespace App\Http\Requests\Admin;
 
 use App\Models\InspectionTemplate;
 use App\Services\InspectionPhotoStore;
+use App\Services\VisionCatalog;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -27,7 +28,7 @@ class SaveInspectionTemplateRequest extends FormRequest
             'items.*.id' => ['nullable', 'integer', 'distinct'],
             'items.*.title' => ['required', 'string', 'max:255'],
             'items.*.instructions' => ['required', 'string', 'max:3000'],
-            'items.*.check_key' => ['required', 'string', Rule::in(array_keys(config('inspections.checks', [])))],
+            'items.*.check_key' => ['required', 'string', Rule::in(array_keys(app(VisionCatalog::class)->choices($this->route('template'))))],
             'items.*.is_required' => ['required', 'boolean'],
             'items.*.reference_photo' => ['nullable', ...InspectionPhotoStore::rules()],
             'items.*.remove_reference_photo' => ['sometimes', 'boolean'],

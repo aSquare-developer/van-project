@@ -105,9 +105,9 @@ In GitHub repository settings, require the CI `test` matrix checks before mergin
 
 ## Photo analysis service and Zone queue
 
-Set `VISION_ENDPOINT` to the full trusted HTTPS endpoint, `VISION_TOKEN` to its server-only bearer token and `VISION_SILICONE_MODEL_VERSION` to the deployed, immutable model version. No credentials, model or service endpoint are provided by this repository. This is a custom version-1 contract, not a direct Roboflow API adapter: the separate service must implement the contract in architecture.md and can run a Roboflow model internally. Only configure a service authorized to receive these private photographs. Disable request/response body and authorization-header logging there too.
+For legacy/custom checks only, set `VISION_ENDPOINT` to the full trusted HTTPS endpoint, `VISION_TOKEN` to its server-only bearer token and `VISION_SILICONE_MODEL_VERSION` to the deployed, immutable model version. No credentials, model or service endpoint are provided by this repository. This is a custom version-1 contract, not a direct Roboflow API adapter: the separate service must implement the contract in architecture.md and can run a Roboflow model internally. Only configure a service authorized to receive these private photographs. Disable request/response body and authorization-header logging there too.
 
-Rebuild config cache after changing server configuration. New attempts snapshot the check key, expected/empty classes, confidence threshold and model version. Changing configuration does not silently reinterpret old attempts; submit a new photo for a new model/configuration. Missing configuration records an analysis error, never a fabricated recognition result.
+Rebuild config cache after changing server configuration. New assignments snapshot the selected model/rule settings; attempts copy their assigned check configuration. Pre-catalog legacy checks without a snapshot retain configuration-at-upload behavior. For a new registered model/rule, update the template selection and create a new assignment; retrying an existing assignment keeps its original model. Missing configuration records an analysis error, never a fabricated recognition result.
 
 Analysis uses the **database** queue connection and `inspections` queue regardless of the default queue driver. Keep `DB_QUEUE_CONNECTION` unset so job inserts and the dispatch marker share the application's transaction; keep `queue.connections.database.after_commit=false` and `DB_QUEUE_RETRY_AFTER=90` (or greater than the 50-second job timeout). Use the existing jobs/failed_jobs migrations. Check `php84-cli -m` for pcntl before relying on worker-enforced timeouts; HTTP also has its own 5-second connection and 30-second total timeout.
 
@@ -119,6 +119,47 @@ php84-cli artisan schedule:run && php84-cli artisan queue:work database --queue=
 
 Capture cron output in restricted hosting logs and monitor it; do not discard failures. The scheduler queues at most 100 pending/recoverable attempts per minute. The short-lived worker processes committed jobs and reloads current code on its next invocation, so no permanent daemon is required. Backlogs require more worker capacity. A dedicated supervised worker is also possible; restart it on each release.
 
-The durable attempt row acts as an outbox: dispatch failure does not roll back an already uploaded image. A two-minute lease recovers undelivered jobs and crashed workers. Duplicate deliveries cannot claim an active lease; request idempotency uses the same attempt UUID across at most three service calls. The service must persist/deduplicate that UUID together with image hash/check/model, rejecting reuse for different inputs. Transient connection/429/5xx failures wait at least 30 then 60 seconds and are requeued by the scheduler; other HTTP failures and invalid contracts are terminal. Do not use `queue:retry all` as the application retry mechanism. A new photo creates a new independent attempt.
+The durable attempt row acts as an outbox: dispatch failure does not roll back an already uploaded image. A two-minute lease recovers undelivered jobs and crashed workers. Duplicate deliveries cannot claim an active lease; request idempotency uses the same attempt UUID across at most three service calls. A custom-v1 service must persist/deduplicate that UUID together with image hash/check/model, rejecting reuse for different inputs. Transient connection/429/5xx failures wait at least 30 then 60 seconds and are requeued by the scheduler; other HTTP failures and invalid contracts are terminal. Do not use `queue:retry all` as the application retry mechanism. A new photo creates a new independent attempt.
 
 Verify on the server: one stocked holder, one empty holder, one unclear image, service unavailable, repeated delivery and a new photo overtaking an old result. Confirm the worker drains the queue and no bearer token or raw service response appears in application/failed-job logs. Automated tests use HTTP fakes only; real endpoint/model acceptance and cron execution remain deployment acceptance checks (#25). No cron or service is activated automatically by merging.
+
+
+## Roboflow prototype activation
+
+The first direct adapter supports image-classification Workflows, including the user's terminal-tested silicone shelf model. It requires neither OpenAI nor a separate Python/custom-v1 service. The code does not provision an API key or create/train/publish a Roboflow model.
+
+1. Deploy a green commit and run the additive catalog migration through the existing release process. It creates model/revision tables and nullable snapshots on existing checks/attempts, preserving prior records. Keep the database backup and verify the new Admin → Vision models page.
+2. Configure privately on Zone:
+
+```dotenv
+ROBOFLOW_API_KEY=<dedicated-server-side-key>
+ROBOFLOW_WORKFLOW_ROUTE=infer
+ROBOFLOW_AUTOMATIC_DECISIONS=false
+```
+
+`infer` uses the documented `/infer/workflows/{workspace}/{workflow}` endpoint. If the exact successful terminal URL instead uses `/{workspace}/workflows/{workflow}`, set `ROBOFLOW_WORKFLOW_ROUTE=workspace` before registering the revision. The route is snapshotted; changing this server setting alone does not reroute queued/assigned checks. No automatic fallback sends photos a second time. Rebuild config cache after changing server settings; verify key presence in Admin without exposing its value. Keep provider keys out of Git, issues, URLs, browser JavaScript and HTTP request/response logs. A PHP memory limit of 256M is a starting point to verify for maximum-size base64 inputs, not a measured guarantee.
+
+3. Register an active model in Admin. Known settings from the terminal response:
+
+| Setting | Value |
+| --- | --- |
+| Model ID | `lisettes-workspace/silicone-shelf-status-2-resnet18-t1` |
+| Workspace | `lisettes-workspace` |
+| Analysis type | Image classification |
+| Passing class | `occupied` |
+| Failing class | `empty` |
+| Image input name | `image` (confirm against the successful request) |
+| Prediction output name | `predictions` |
+| Workflow ID | Copy the exact ID from the successful terminal request or Roboflow Deploy Workflow; do not derive it from the Model ID |
+| Initial score threshold | `0.8` is a pilot starting setting, not measured production accuracy |
+| Automatic decisions | Off |
+
+Only add other classes if that exact model was trained with them. The template reference photo is optional worker guidance, not a training sample sent with inference. Configure the Workflow to return classification metadata including `resolved_model.model_id`; omit image visualizations and unnecessary outputs so the result stays within the app's 64 KiB cap. A missing/malformed result is an analysis error. Publish separate Workflow IDs when changing production logic; a catalog revision cannot freeze a remotely edited Workflow definition.
+
+4. Select the registered model/rule revision in a template, then create a NEW shift assignment. Existing assignments intentionally keep their old analysis settings, including legacy/custom checks. Merely registering a model does not redirect those old assignments or queued attempts. Model/rule edits create a new revision; select it in the template when ready. Draft/disabled catalog models block new assignments; use the server automatic flag for emergency suppression of automatic results for existing Roboflow assignments too.
+5. Configure the scheduler/inspection worker described above. Submit a photograph from the assigned worker account. Verify awaiting → processing → advisory/inconclusive, recorded class/score, protected image access and request-review/Admin decision flow. Test actual model/credentials/network/response latency; automated tests fake HTTP and do not establish provider availability or recognition accuracy. HTTP connect/total timeouts remain 5/30 seconds; requests and responses never appear in queued job payloads.
+6. Measure false passes, false failures and inconclusive results on independent real occupied, empty, obscured, wrong-area, similar-object, dim-light and handheld-angle photos. Classification does not locate objects or establish target visibility; a high binary-class score on a wrong scene is possible. Keep advisory mode until your held-out results justify automatic decisions. If accepted, opt in via a new model/rule revision and set the server `ROBOFLOW_AUTOMATIC_DECISIONS=true`; rebuild config, update the template and issue new assignments. Never treat the displayed score as measured accuracy.
+
+Provider spending/privacy controls need review for the actual account. Each attempt sends at most three requests; idempotency headers do not guarantee Roboflow billing deduplication, so interrupted calls can still be billed. Preserve the existing upload throttle and monitor queue volume. Before rolling code back to a version without this adapter, stop workers and resolve pending Roboflow attempts: older code does not understand their snapshots. Do not drop revision history as part of rollback.
+
+First live activation remains dependent on the exact Workflow ID, server API key, cron and real-photo acceptance (#25). Copy the exact Workflow ID from the successful request; registration deliberately does not invent or provision a Workflow. No paid API call or provider configuration is performed by automated tests.
