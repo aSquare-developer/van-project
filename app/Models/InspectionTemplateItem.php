@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-#[Fillable(['position', 'title', 'instructions', 'check_key', 'expected_class', 'is_required', 'reference_photo_id'])]
+#[Fillable(['position', 'title', 'instructions', 'check_key', 'expected_class', 'is_required', 'reference_photo_id', 'vision_model_revision_id'])]
 class InspectionTemplateItem extends Model
 {
     /** @use HasFactory<InspectionTemplateItemFactory> */

@@ -12,7 +12,7 @@
         </div>
         <div>
             <h2 class="text-xl font-semibold">Checklist items</h2>
-            <p class="mt-2 text-sm text-slate-500">Choose an available check for each item. Up to 30 items per template.</p>
+            <p class="mt-2 text-sm text-slate-500">Choose an available check and model revision for each item. Up to 30 items per template.</p>
         </div>
         <noscript><p class="rounded border border-amber-300 bg-amber-50 p-4">Enable JavaScript to add, remove or reorder items.</p></noscript>
         @php

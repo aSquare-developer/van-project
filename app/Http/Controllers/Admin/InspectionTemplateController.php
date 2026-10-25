@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Admin\SaveInspectionTemplateRequest;
 use App\Models\InspectionTemplate;
 use App\Services\InspectionCatalog;
+use App\Services\VisionCatalog;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\View\View;
@@ -23,7 +24,7 @@ class InspectionTemplateController extends Controller
     {
         Gate::authorize('create', InspectionTemplate::class);
 
-        return view('admin.templates.form', ['template' => new InspectionTemplate, 'checks' => config('inspections.checks')]);
+        return view('admin.templates.form', ['template' => new InspectionTemplate, 'checks' => app(VisionCatalog::class)->choices()]);
     }
 
     public function store(SaveInspectionTemplateRequest $request, InspectionCatalog $catalog): RedirectResponse
@@ -37,7 +38,7 @@ class InspectionTemplateController extends Controller
     {
         Gate::authorize('update', $template);
 
-        return view('admin.templates.form', ['template' => $template->load('items'), 'checks' => config('inspections.checks')]);
+        return view('admin.templates.form', ['template' => $template->load('items'), 'checks' => app(VisionCatalog::class)->choices($template)]);
     }
 
     public function update(SaveInspectionTemplateRequest $request, InspectionTemplate $template, InspectionCatalog $catalog): RedirectResponse

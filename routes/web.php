@@ -5,6 +5,7 @@ use App\Http\Controllers\Admin\InspectionTemplateController;
 use App\Http\Controllers\Admin\ShiftController;
 use App\Http\Controllers\Admin\UserController;
 use App\Http\Controllers\Admin\VanController;
+use App\Http\Controllers\Admin\VisionModelController;
 use App\Http\Controllers\Auth\PasswordResetController;
 use App\Http\Controllers\Auth\SessionController;
 use App\Http\Controllers\DashboardController;
@@ -26,6 +27,7 @@ Route::middleware(['auth', 'active'])->group(function (): void {
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/activity', ActivityLogController::class)->name('activity.index');
         Route::resource('users', UserController::class)->except('show');
+        Route::resource('vision-models', VisionModelController::class)->except(['show', 'destroy']);
         Route::resource('vans', VanController::class)->except(['show', 'destroy']);
         Route::resource('templates', InspectionTemplateController::class)->except(['show', 'destroy'])->middlewareFor(['store', 'update'], 'throttle:inspection-uploads');
         Route::get('/templates/{template}/items/{item}/reference', [InspectionPhotoController::class, 'templateReference'])->scopeBindings()->name('templates.items.reference');

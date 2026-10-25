@@ -48,7 +48,13 @@
                         @if($attempt->status === 'error')
                             <p class="mt-2 text-sm text-slate-600">Analysis is unavailable. Contact your administrator or submit a new photo when the service is available.</p>
                         @else
-                            <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Confidence: {{ number_format($attempt->confidence * 100, 1) }}%</p>
+                            @if(($attempt->analysis_config['provider'] ?? null) === 'roboflow')
+                                @if($attempt->decision_mode === 'advisory')<p class="mt-2 text-sm text-slate-600">Advisory analysis only. Administrator review is required; this observation does not approve or reject the check.</p>@endif
+                                <p class="mt-2 text-sm text-slate-600">Predicted class: {{ $attempt->detected_class }}</p>
+                                <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }} · Model score: {{ number_format($attempt->confidence * 100, 1) }}% (not measured accuracy)</p>
+                            @else
+                                <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Confidence: {{ number_format($attempt->confidence * 100, 1) }}%</p>
+                            @endif
                         @endif
                     @else
                         <p class="mt-3 text-sm text-slate-600">{{ $attempt->status === 'processing' ? 'Analysis in progress.' : 'Awaiting analysis.' }} No recognition result has been recorded for this photo. Refresh this page to check for a result.</p>

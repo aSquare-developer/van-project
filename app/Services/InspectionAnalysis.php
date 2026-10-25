@@ -91,7 +91,8 @@ class InspectionAnalysis
             $attempt->forceFill([
                 'status' => isset($result['error']) ? 'error' : 'analysed',
                 'error_code' => $result['error'] ?? null, 'result' => $status->value,
-                'detected_class' => $result['detected_class'] ?? null, 'confidence' => $result['confidence'] ?? null,
+                'detected_class' => $result['detected_class'] ?? null,
+                'observed_outcome' => $result['observed_outcome'] ?? null, 'decision_mode' => $result['decision_mode'] ?? null, 'confidence' => $result['confidence'] ?? null,
                 'boxes' => $result['boxes'] ?? null, 'analysed_at' => now(), 'processing_token' => null, 'retry_at' => null,
             ])->save();
             $latestId = $check->attempts()->max('id');
