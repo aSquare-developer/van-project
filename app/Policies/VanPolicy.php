@@ -8,6 +8,11 @@ use App\Models\Van;
 
 class VanPolicy
 {
+    public function delete(User $user, Van $record): bool
+    {
+        return $user->is_active && $user->role === Role::Admin;
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->is_active && $user->role === Role::Admin;

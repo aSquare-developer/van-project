@@ -7,7 +7,7 @@
         @forelse($templates as $template)
             <article class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5">
                 <div class="min-w-0"><h2 class="break-words font-semibold">{{ $template->name }}</h2><p class="mt-1 text-sm text-slate-500">{{ $template->items_count }} items · {{ $template->is_active ? 'Active' : 'Inactive' }}</p></div>
-                <a href="{{ route('admin.templates.edit', $template) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm">Edit template</a>
+                <div class="flex flex-wrap items-start gap-3"><a href="{{ route('admin.templates.edit', $template) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm">Edit template</a><x-delete-resource :action="route('admin.templates.destroy', $template)" label="template" :name="$template->name" message="The template will disappear from the list and new assignments. Existing checklists and reference photos are retained." /></div>
             </article>
         @empty
             <p class="rounded-xl border border-dashed border-slate-300 p-8 text-slate-500">No templates yet. Create a checklist before assigning a shift.</p>

@@ -1,6 +1,7 @@
 <x-layout title="Shift details">
     <a href="{{ route('admin.shifts.index') }}" class="text-sm underline">← All shifts</a>
     <h1 class="mb-2 mt-5 break-words text-3xl font-semibold">{{ $shift->title }}</h1>
+    <div class="mb-5"><x-delete-resource :action="route('admin.shifts.destroy', $shift)" label="shift" :name="$shift->title" message="The shift will disappear for its worker as well. Pending analysis will be cancelled; saved history is retained." /></div>
     <p class="mb-8 text-slate-500">{{ ucfirst(str_replace('_', ' ', $shift->status->value)) }} · {{ $shift->shift_date->format('d M Y') }}</p>
     <dl class="mb-8 grid gap-5 rounded-xl border border-slate-200 bg-white p-6 sm:grid-cols-2">
         <div><dt class="text-sm text-slate-500">Worker</dt><dd class="mt-1 break-words font-medium">{{ $shift->worker->name }}</dd></div>

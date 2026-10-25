@@ -7,7 +7,7 @@
         @forelse($vans as $van)
             <article class="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-slate-200 bg-white p-5">
                 <div><h2 class="font-semibold">{{ $van->name }}</h2><p class="mt-1 text-sm text-slate-500">{{ $van->registration ?? 'No registration entered' }} · {{ $van->is_active ? 'Active' : 'Inactive' }}</p></div>
-                <a href="{{ route('admin.vans.edit', $van) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm">Edit van</a>
+                <div class="flex flex-wrap items-start gap-3"><a href="{{ route('admin.vans.edit', $van) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm">Edit van</a><x-delete-resource :action="route('admin.vans.destroy', $van)" label="van" :name="$van->name" message="The van will disappear from the list and new assignments. Existing shifts keep their vehicle details." /></div>
             </article>
         @empty
             <p class="rounded-xl border border-dashed border-slate-300 p-8 text-slate-500">No vans yet. Add a van before assigning a shift.</p>

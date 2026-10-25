@@ -23,9 +23,9 @@ class PruneInspectionPhotos extends Command
             $query->where(function (Builder $attempts): void {
                 $attempts->where('purpose', 'attempt')
                     ->where('created_at', '<', now()->subDays(max(1, (int) config('inspections.photo_retention_days'))))
-                    ->whereHas('attempt.check.shift', fn (Builder $shifts) => $shifts->whereIn('status', [
+                    ->whereHas('attempt.check.shift', fn (Builder $shifts) => $shifts->withTrashed()->where(fn (Builder $states) => $states->whereNotNull('deleted_at')->orWhereIn('status', [
                         ShiftStatus::Completed, ShiftStatus::CompletedWithRemarks,
-                    ]));
+                    ])));
             })->orWhere(function (Builder $references): void {
                 $references->where('purpose', 'reference')
                     ->where('created_at', '<', now()->subDays(max(1, (int) config('inspections.orphan_reference_days'))))

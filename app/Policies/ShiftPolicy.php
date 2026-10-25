@@ -8,6 +8,11 @@ use App\Models\User;
 
 class ShiftPolicy
 {
+    public function delete(User $user, Shift $shift): bool
+    {
+        return $user->is_active && $user->role === Role::Admin;
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->is_active && in_array($user->role, [Role::Admin, Role::User], true);

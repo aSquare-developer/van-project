@@ -20,8 +20,8 @@ class StoreShiftRequest extends FormRequest
             'title' => ['required', 'string', 'max:255'],
             'shift_date' => ['required', 'date_format:Y-m-d'],
             'worker_id' => ['required', 'integer', Rule::exists('users', 'id')->where('is_active', true)->where('role', Role::User->value)],
-            'van_id' => ['required', 'integer', Rule::exists('vans', 'id')->where('is_active', true)],
-            'inspection_template_id' => ['required', 'integer', Rule::exists('inspection_templates', 'id')->where('is_active', true)],
+            'van_id' => ['required', 'integer', Rule::exists('vans', 'id')->where('is_active', true)->whereNull('deleted_at')],
+            'inspection_template_id' => ['required', 'integer', Rule::exists('inspection_templates', 'id')->where('is_active', true)->whereNull('deleted_at')],
         ];
     }
 }

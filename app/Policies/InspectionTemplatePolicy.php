@@ -8,6 +8,11 @@ use App\Models\User;
 
 class InspectionTemplatePolicy
 {
+    public function delete(User $user, InspectionTemplate $record): bool
+    {
+        return $user->is_active && $user->role === Role::Admin;
+    }
+
     public function viewAny(User $user): bool
     {
         return $user->is_active && $user->role === Role::Admin;

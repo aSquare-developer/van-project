@@ -57,11 +57,11 @@ class VisionCatalog
         $choices = [];
         $referenced = $template?->exists ? $template->items()->whereNotNull('vision_model_revision_id')->pluck('vision_model_revision_id') : collect();
         $revisions = VisionModelRevision::query()->with('model')
-            ->where(fn ($query) => $query->whereHas('model', fn ($models) => $models->where('status', 'active'))->orWhereIn('id', $referenced))
+            ->where(fn ($query) => $query->whereHas('model', fn ($models) => $models->whereNull('deleted_at')->where('status', 'active'))->orWhereIn('id', $referenced))
             ->orderByDesc('id')->get();
         foreach ($revisions as $revision) {
             $choices['rf_revision_'.$revision->id] = [
-                'name' => $revision->model->name.' · revision '.$revision->version.($revision->model->status === 'active' ? '' : ' (unavailable for assignment)'),
+                'name' => $revision->model->name.' · revision '.$revision->version.(! $revision->model->trashed() && $revision->model->status === 'active' ? '' : ' (unavailable for assignment)'),
             ];
         }
 
@@ -73,7 +73,7 @@ class VisionCatalog
     {
         if (preg_match('/\Arf_revision_([1-9][0-9]*)\z/', $key, $matches)) {
             $revision = VisionModelRevision::query()->with('model')->find($matches[1]);
-            if (! $revision || ($revision->model->status !== 'active' && $existing?->vision_model_revision_id !== $revision->id)) {
+            if (! $revision || (($revision->model->trashed() || $revision->model->status !== 'active') && $existing?->vision_model_revision_id !== $revision->id)) {
                 throw ValidationException::withMessages(['items' => 'Select an active analysis model.']);
             }
 

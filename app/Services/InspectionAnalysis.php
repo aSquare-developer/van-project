@@ -73,10 +73,10 @@ class InspectionAnalysis
     {
         DB::transaction(function () use ($claimed, $result): void {
             $check = $claimed->check;
-            $shift = Shift::query()->lockForUpdate()->findOrFail($check->shift_id);
+            $shift = Shift::withTrashed()->lockForUpdate()->findOrFail($check->shift_id);
             $check = ShiftCheck::query()->lockForUpdate()->findOrFail($check->id);
             $attempt = InspectionAttempt::query()->lockForUpdate()->findOrFail($claimed->id);
-            if ($attempt->status !== 'processing' || $attempt->processing_token !== $claimed->processing_token) {
+            if ($shift->trashed() || $attempt->status !== 'processing' || $attempt->processing_token !== $claimed->processing_token) {
                 return;
             }
             if (isset($result['error']) && $result['retryable'] && $attempt->analysis_runs < 3) {

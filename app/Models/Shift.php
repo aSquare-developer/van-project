@@ -10,11 +10,14 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Shift extends Model
 {
     /** @use HasFactory<ShiftFactory> */
     use HasFactory;
+
+    use SoftDeletes;
 
     protected function casts(): array
     {
@@ -47,12 +50,12 @@ class Shift extends Model
 
     public function van(): BelongsTo
     {
-        return $this->belongsTo(Van::class);
+        return $this->belongsTo(Van::class)->withTrashed();
     }
 
     public function template(): BelongsTo
     {
-        return $this->belongsTo(InspectionTemplate::class, 'inspection_template_id');
+        return $this->belongsTo(InspectionTemplate::class, 'inspection_template_id')->withTrashed();
     }
 
     public function checks(): HasMany

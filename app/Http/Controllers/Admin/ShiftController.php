@@ -10,6 +10,7 @@ use App\Models\InspectionTemplate;
 use App\Models\Shift;
 use App\Models\User;
 use App\Models\Van;
+use App\Services\ResourceDeletion;
 use App\Services\ShiftAssigner;
 use App\Services\ShiftWorkflow;
 use Illuminate\Database\Eloquent\Builder;
@@ -21,6 +22,15 @@ use Illuminate\View\View;
 
 class ShiftController extends Controller
 {
+    public function destroy(Request $request, Shift $shift, ResourceDeletion $deletion): RedirectResponse
+    {
+        Gate::authorize('delete', $shift);
+        $request->validate(['confirmed' => ['required', 'accepted']]);
+        $deletion->delete($request->user(), $shift);
+
+        return redirect()->route('admin.shifts.index')->with('status', 'Shift deleted. Saved inspection history is retained.');
+    }
+
     public function index(Request $request): View
     {
         Gate::authorize('create', Shift::class);

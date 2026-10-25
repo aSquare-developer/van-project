@@ -27,11 +27,11 @@ Route::middleware(['auth', 'active'])->group(function (): void {
     Route::middleware('role:admin')->prefix('admin')->name('admin.')->group(function (): void {
         Route::get('/activity', ActivityLogController::class)->name('activity.index');
         Route::resource('users', UserController::class)->except('show');
-        Route::resource('vision-models', VisionModelController::class)->except(['show', 'destroy']);
-        Route::resource('vans', VanController::class)->except(['show', 'destroy']);
-        Route::resource('templates', InspectionTemplateController::class)->except(['show', 'destroy'])->middlewareFor(['store', 'update'], 'throttle:inspection-uploads');
+        Route::resource('vision-models', VisionModelController::class)->except('show');
+        Route::resource('vans', VanController::class)->except('show');
+        Route::resource('templates', InspectionTemplateController::class)->except('show')->middlewareFor(['store', 'update'], 'throttle:inspection-uploads');
         Route::get('/templates/{template}/items/{item}/reference', [InspectionPhotoController::class, 'templateReference'])->scopeBindings()->name('templates.items.reference');
-        Route::resource('shifts', ShiftController::class)->only(['index', 'create', 'store', 'show']);
+        Route::resource('shifts', ShiftController::class)->only(['index', 'create', 'store', 'show', 'destroy']);
         Route::post('/shifts/{shift}/review', [ShiftWorkflowController::class, 'review'])->middleware('throttle:30,1')->name('shifts.review');
     });
     Route::get('/dashboard', DashboardController::class)->name('dashboard');
