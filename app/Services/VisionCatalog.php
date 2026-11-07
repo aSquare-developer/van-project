@@ -39,6 +39,11 @@ class VisionCatalog
                 'confidence_threshold' => (float) $values['confidence_threshold'],
                 'automatic_decisions' => (bool) $values['automatic_decisions'],
             ];
+            if ($values['analysis_type'] === 'object_detection') {
+                $settings = [...$settings, 'failing_class' => null, 'uncertain_classes' => [], 'min_count' => (int) $values['min_count']];
+            } else {
+                unset($settings['min_count']);
+            }
             $record->forceFill(['name' => $values['name'], 'status' => $values['status']])->save();
             if (! $latest || $latest->settings != $settings) {
                 $revision = new VisionModelRevision;
@@ -80,7 +85,7 @@ class VisionCatalog
             return [
                 ...$revision->settings, 'revision_id' => $revision->id,
                 'expected_class' => $revision->settings['passing_class'],
-                'absent_class' => $revision->settings['failing_class'],
+                'absent_class' => $revision->settings['failing_class'] ?? null,
                 'model_version' => $revision->settings['model_id'],
             ];
         }

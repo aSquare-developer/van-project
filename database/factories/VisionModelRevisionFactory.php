@@ -9,6 +9,15 @@ use Illuminate\Database\Eloquent\Factories\Factory;
 /** @extends Factory<VisionModelRevision> */
 class VisionModelRevisionFactory extends Factory
 {
+    public function objectDetection(): static
+    {
+        return $this->state(fn (array $attributes): array => ['settings' => [
+            ...$attributes['settings'], 'analysis_type' => 'object_detection',
+            'model_id' => 'lisettes-workspace/silicone-tube-rfdetr-small-1', 'workflow_id' => 'silicone-tube-detection-test',
+            'passing_class' => 'tube', 'failing_class' => null, 'uncertain_classes' => [], 'min_count' => 2,
+        ]]);
+    }
+
     public function definition(): array
     {
         return [

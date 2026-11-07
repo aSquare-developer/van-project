@@ -24,7 +24,7 @@ class RoboflowVisionClient
             || $settings['model_id'] !== $attempt->model_version || $settings['passing_class'] !== $attempt->expected_class
             || $settings['failing_class'] !== $attempt->absent_class
             || abs((float) $settings['confidence_threshold'] - $attempt->confidence_threshold) > 0.000001) {
-            return ['error' => 'configuration_error', 'retryable' => false];
+            return ['error' => 'configuration_error', 'retryable' => false, 'detail' => $this->configurationProblem($attempt, $settings, $key)];
         }
         $responseBody = null;
         try {
@@ -32,24 +32,25 @@ class RoboflowVisionClient
             $disk = Storage::disk('inspection-photos');
             if (! $photo || $photo->purged_at || ! in_array($photo->mime, ['image/jpeg', 'image/png', 'image/webp'], true)
                 || ! $disk->exists($photo->path) || $disk->size($photo->path) > 10 * 1024 * 1024) {
-                return ['error' => 'photo_unavailable', 'retryable' => false];
+                return ['error' => 'photo_unavailable', 'retryable' => false, 'detail' => 'photo_missing'];
             }
             $bytes = $disk->get($photo->path);
             if (! is_string($bytes) || $bytes === '') {
-                return ['error' => 'photo_unavailable', 'retryable' => false];
+                return ['error' => 'photo_unavailable', 'retryable' => false, 'detail' => 'photo_empty'];
             }
             $workspace = rawurlencode($settings['workspace']);
             $workflow = rawurlencode($settings['workflow_id']);
             $path = $settings['api_route'] === 'infer' ? '/infer/workflows/'.$workspace.'/'.$workflow : '/'.$workspace.'/workflows/'.$workflow;
-            $response = Http::withToken($key)->acceptJson()->connectTimeout(5)->timeout(30)
+            $response = Http::acceptJson()->connectTimeout(5)->timeout(30)
                 ->withoutRedirecting()->withOptions(['stream' => true])
                 ->withHeaders(['Idempotency-Key' => $attempt->submission_key])
                 ->post('https://serverless.roboflow.com'.$path, [
+                    'api_key' => $key,
                     'inputs' => [$settings['input_name'] => ['type' => 'base64', 'value' => base64_encode($bytes)]],
                 ]);
             $responseBody = $response->toPsrResponse()->getBody();
             if ($response->status() !== 200) {
-                return ['error' => 'service_unavailable', 'retryable' => $response->status() === 429 || $response->serverError()];
+                return ['error' => 'service_unavailable', 'retryable' => $response->status() === 429 || $response->serverError(), 'detail' => 'http_'.$response->status()];
             }
             $body = '';
             while (! $responseBody->eof() && strlen($body) < 65537) {
@@ -61,10 +62,12 @@ class RoboflowVisionClient
             }
             $data = strlen($body) <= 65536 ? json_decode($body, true) : null;
 
-            return $this->normalize($attempt, $settings, $data);
-        } catch (Throwable) {
-            // HTTP exception text can contain private photographs and authentication headers.
-            return ['error' => 'service_unavailable', 'retryable' => true];
+            return $settings['analysis_type'] === 'object_detection'
+                ? $this->normalizeDetection($attempt, $settings, $data)
+                : $this->normalize($attempt, $settings, $data);
+        } catch (Throwable $exception) {
+            // HTTP exception text can contain private photographs and the API key; only its class is reported.
+            return ['error' => 'service_unavailable', 'retryable' => true, 'detail' => 'exception_'.class_basename($exception)];
         } finally {
             $responseBody?->close();
         }
@@ -73,7 +76,7 @@ class RoboflowVisionClient
     /** @return array<string, mixed> */
     private function normalize(InspectionAttempt $attempt, array $settings, mixed $data): array
     {
-        $invalid = ['error' => 'invalid_response', 'retryable' => false];
+        $invalid = ['error' => 'invalid_response', 'retryable' => false, 'detail' => 'unexpected_payload'];
         if (! is_array($data) || ! is_array($data['outputs'] ?? null) || ! array_is_list($data['outputs']) || count($data['outputs']) !== 1) {
             return $invalid;
         }
@@ -116,6 +119,63 @@ class RoboflowVisionClient
             'detected_class' => $top, 'confidence' => $confidence, 'boxes' => [],
             'observed_outcome' => $outcome, 'decision_mode' => $automatic ? 'automatic' : 'advisory',
         ];
+    }
+
+    /**
+     * Counts target-class detections: at least min_count at or above the threshold passes, borderline counts need review.
+     *
+     * @return array<string, mixed>
+     */
+    private function normalizeDetection(InspectionAttempt $attempt, array $settings, mixed $data): array
+    {
+        $invalid = ['error' => 'invalid_response', 'retryable' => false, 'detail' => 'unexpected_payload'];
+        $output = is_array($data) && is_array($data['outputs'] ?? null) && array_is_list($data['outputs']) && count($data['outputs']) === 1
+            ? ($data['outputs'][0][$settings['output_name']] ?? null) : null;
+        if (! is_array($output) || ! is_array($output['predictions'] ?? null) || ! array_is_list($output['predictions']) || count($output['predictions']) > 300
+            || ($output['prediction_type'] ?? 'object-detection') !== 'object-detection'
+            || (isset($output['resolved_model']['model_id']) && $output['resolved_model']['model_id'] !== $attempt->model_version)
+            || ! $this->dimension($output['image']['width'] ?? null) || ! $this->dimension($output['image']['height'] ?? null)) {
+            return $invalid;
+        }
+        $strong = $weak = 0;
+        $best = 0.0;
+        foreach ($output['predictions'] as $item) {
+            if (! is_array($item) || ! is_string($item['class'] ?? null) || ! $this->score($item['confidence'] ?? null)) {
+                return $invalid;
+            }
+            if ($item['class'] !== $settings['passing_class']) {
+                continue;
+            }
+            $best = max($best, (float) $item['confidence']);
+            $item['confidence'] >= $attempt->confidence_threshold ? $strong++ : $weak++;
+        }
+        $outcome = $strong >= $settings['min_count'] ? 'present' : ($strong + $weak >= $settings['min_count'] ? 'uncertain' : 'absent');
+        $automatic = $settings['automatic_decisions'] && config('inspections.roboflow.automatic_decisions') === true;
+        $decisive = $automatic && $outcome !== 'uncertain';
+
+        return [
+            'result' => $decisive ? ($outcome === 'present' ? 'passed' : 'failed') : 'inconclusive',
+            'detected_class' => $strong + $weak > 0 ? $settings['passing_class'] : null, 'detected_count' => $strong,
+            'confidence' => $best, 'boxes' => [], 'observed_outcome' => $outcome, 'decision_mode' => $automatic ? 'automatic' : 'advisory',
+        ];
+    }
+
+    private function dimension(mixed $value): bool
+    {
+        return is_int($value) && $value >= 1 && $value <= 65536;
+    }
+
+    /** @param array<string, mixed>|mixed $settings */
+    private function configurationProblem(InspectionAttempt $attempt, mixed $settings, mixed $key): string
+    {
+        if (! is_string($key) || trim($key) === '') {
+            return 'api_key_missing';
+        }
+        if (! is_array($settings)) {
+            return 'snapshot_missing';
+        }
+
+        return isset($settings['model_id']) && $settings['model_id'] !== $attempt->model_version ? 'snapshot_mismatch' : 'snapshot_invalid';
     }
 
     private function score(mixed $value): bool

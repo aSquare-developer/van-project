@@ -72,6 +72,24 @@ class VisionCatalogTest extends TestCase
         $this->get('/dashboard')->assertSee(route('admin.vision-models.index'));
     }
 
+    public function test_admin_registers_object_detection_model_with_minimum_count_and_no_failing_class(): void
+    {
+        $this->signIn(User::factory()->create(['role' => Role::Admin]));
+        $detection = $this->data(['name' => 'Tubes', 'analysis_type' => 'object_detection', 'model_id' => 'lisettes-workspace/tube-rfdetr-small-1',
+            'passing_class' => 'tube', 'failing_class' => '', 'uncertain_classes' => 'ignored', 'min_count' => '3']);
+        $this->post('/admin/vision-models', [...$detection, 'min_count' => ''])->assertSessionHasErrors('min_count');
+        $this->post('/admin/vision-models', [...$detection, 'min_count' => '0'])->assertSessionHasErrors('min_count');
+        $this->post('/admin/vision-models', $detection)->assertRedirect('/admin/vision-models');
+        $settings = VisionModel::firstOrFail()->latestRevision->settings;
+        $this->assertSame(['object_detection', 3, null, []], [$settings['analysis_type'], $settings['min_count'], $settings['failing_class'], $settings['uncertain_classes']]);
+        $this->get('/admin/vision-models')->assertOk()->assertSee('Pass: at least 3 × tube');
+        $definition = app(VisionCatalog::class)->definition('rf_revision_'.VisionModel::firstOrFail()->latestRevision->id);
+        $this->assertNull($definition['absent_class']);
+        $this->post('/admin/vision-models', $this->data(['name' => 'Shelf', 'failing_class' => '']))->assertSessionHasErrors('failing_class');
+        $this->post('/admin/vision-models', $this->data(['name' => 'Shelf', 'min_count' => '4']))->assertRedirect();
+        $this->assertArrayNotHasKey('min_count', VisionModel::where('name', 'Shelf')->firstOrFail()->latestRevision->settings);
+    }
+
     public function test_only_active_admin_can_access_or_modify_catalog(): void
     {
         $model = VisionModel::factory()->create();
