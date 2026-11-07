@@ -67,6 +67,27 @@ class RoboflowVisionTest extends TestCase
         ], $prediction)]], 'profiler_trace' => []];
     }
 
+    private function detectionAttempt(array $settings = []): InspectionAttempt
+    {
+        $revision = VisionModelRevision::factory()->objectDetection()->create();
+        $revision = VisionModelRevision::factory()->create(['settings' => array_replace($revision->settings, $settings)]);
+        $definition = app(VisionCatalog::class)->definition('rf_revision_'.$revision->id);
+        $check = ShiftCheck::factory()->create(['check_key' => 'rf_revision_'.$revision->id,
+            'expected_class' => $definition['passing_class'], 'analysis_config' => $definition]);
+
+        return $this->attempt($check);
+    }
+
+    /** @param list<array{string, float}> $detections */
+    private function detectionResponse(array $detections, array $output = []): array
+    {
+        return ['outputs' => [['predictions' => array_replace([
+            'image' => ['width' => 3024, 'height' => 4032],
+            'predictions' => array_map(fn (array $detection): array => ['x' => 100.5, 'y' => 200.5, 'width' => 50, 'height' => 60,
+                'confidence' => $detection[1], 'class_id' => 1, 'class' => $detection[0], 'detection_id' => Str::uuid()->toString(), 'parent_id' => 'image'], $detections),
+        ], $output)]], 'profiler_trace' => []];
+    }
+
     private function fakeResponse(array|string $body, int $status = 200): void
     {
         Http::swap(new Factory);
@@ -167,6 +188,76 @@ class RoboflowVisionTest extends TestCase
             $this->assertSame($expected, $attempt->check->fresh()->status);
             $this->assertSame($class, $attempt->refresh()->detected_class);
         }
+    }
+
+    public function test_object_detection_counts_only_the_target_class_at_or_above_the_threshold(): void
+    {
+        config(['inspections.roboflow.automatic_decisions' => true]);
+        foreach ([
+            [[['tube', 0.95], ['tube', 0.9], ['bottle', 0.99]], CheckStatus::Passed, 'present', 2, 0.95],
+            [[['tube', 0.95], ['bottle', 0.99]], CheckStatus::Failed, 'absent', 1, 0.95],
+            [[['bottle', 0.99]], CheckStatus::Failed, 'absent', 0, 0.0],
+            [[], CheckStatus::Failed, 'absent', 0, 0.0],
+            [[['tube', 0.95], ['tube', 0.5]], CheckStatus::Inconclusive, 'uncertain', 1, 0.95],
+        ] as [$detections, $status, $outcome, $count, $best]) {
+            $attempt = $this->detectionAttempt(['automatic_decisions' => true]);
+            $this->fakeResponse($this->detectionResponse($detections));
+            app(InspectionAnalysis::class)->run($attempt->id);
+            $attempt->refresh();
+            $this->assertSame('analysed', $attempt->status);
+            $this->assertSame($status, $attempt->check->fresh()->status);
+            $this->assertSame($outcome, $attempt->observed_outcome);
+            $this->assertSame($count, $attempt->detected_count);
+            $this->assertSame($best, $attempt->confidence);
+            $this->assertSame([], $attempt->boxes);
+        }
+    }
+
+    public function test_object_detection_stays_advisory_until_the_revision_and_server_opt_in(): void
+    {
+        $attempt = $this->detectionAttempt();
+        $this->fakeResponse($this->detectionResponse([['tube', 0.95], ['tube', 0.9]]));
+        app(InspectionAnalysis::class)->run($attempt->id);
+        $this->assertSame('inconclusive', $attempt->refresh()->result);
+        $this->assertSame('present', $attempt->observed_outcome);
+        $this->assertSame('advisory', $attempt->decision_mode);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://serverless.roboflow.com/infer/workflows/lisettes-workspace/silicone-tube-detection-test');
+    }
+
+    public function test_object_detection_model_identity_is_checked_when_returned_and_malformed_output_is_rejected(): void
+    {
+        $good = [['tube', 0.95]];
+        foreach ([
+            ['resolved_model' => ['model_id' => 'wrong/model']], ['prediction_type' => 'classification'],
+            ['image' => ['width' => 0, 'height' => 4032]], ['predictions' => ['not-a-detection']],
+            ['predictions' => [['class' => 'tube']]], ['predictions' => [['class' => 'tube', 'confidence' => 1.5]]],
+            ['predictions' => ['a' => ['class' => 'tube', 'confidence' => 0.9]]],
+        ] as $invalid) {
+            $attempt = $this->detectionAttempt();
+            $this->fakeResponse($this->detectionResponse($good, $invalid));
+            app(InspectionAnalysis::class)->run($attempt->id);
+            $this->assertSame('invalid_response', $attempt->refresh()->error_code);
+            $this->assertSame(CheckStatus::AnalysisError, $attempt->check->fresh()->status);
+        }
+        $attempt = $this->detectionAttempt();
+        $this->fakeResponse($this->detectionResponse($good, ['resolved_model' => ['model_id' => $attempt->model_version]]));
+        app(InspectionAnalysis::class)->run($attempt->id);
+        $this->assertSame('analysed', $attempt->refresh()->status);
+    }
+
+    public function test_confirmed_object_detection_results_allow_completion_and_show_the_count(): void
+    {
+        config(['inspections.roboflow.automatic_decisions' => true]);
+        $attempt = $this->detectionAttempt(['automatic_decisions' => true]);
+        $check = $attempt->check;
+        $this->fakeResponse($this->detectionResponse([['tube', 0.95], ['tube', 0.9]]));
+        app(InspectionAnalysis::class)->run($attempt->id);
+        $this->assertSame(CheckStatus::Passed, $check->fresh()->status);
+        $this->signIn($check->shift->worker)->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()
+            ->assertSee('Detected: 2 × tube (required: 2)')->assertDontSee('Predicted class');
+        $this->post('/shifts/'.$check->shift_id.'/complete', ['request_key' => Str::uuid()->toString(), 'revision' => $check->shift->fresh()->revision])
+            ->assertRedirect(route('shifts.show', $check->shift_id));
+        $this->assertSame(ShiftStatus::Completed, $check->shift->fresh()->status);
     }
 
     public function test_enabling_server_automatic_flag_does_not_upgrade_existing_advisory_revisions(): void

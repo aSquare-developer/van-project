@@ -10,7 +10,7 @@
                 @if($model->latestRevision)
                     @php($settings = $model->latestRevision->settings)
                     <p class="mt-4 break-all text-sm text-slate-600">{{ $settings['model_id'] }}</p>
-                    <p class="mt-2 text-sm text-slate-600">Pass: {{ $settings['passing_class'] }} · Fail: {{ $settings['failing_class'] }} · Minimum score: {{ number_format($settings['confidence_threshold'] * 100, 1) }}%</p>
+                    <p class="mt-2 text-sm text-slate-600">{{ ($settings['analysis_type'] ?? null) === 'object_detection' ? 'Pass: at least '.$settings['min_count'].' × '.$settings['passing_class'] : 'Pass: '.$settings['passing_class'].' · Fail: '.$settings['failing_class'] }} · Minimum score: {{ number_format($settings['confidence_threshold'] * 100, 1) }}%</p>
                     <p class="mt-2 text-xs text-slate-500">{{ $settings['automatic_decisions'] ? 'Automatic decisions requested; server enablement also required.' : 'Advisory revision: observations require administrator review.' }}</p>
                 @endif
             </article>

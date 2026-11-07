@@ -137,6 +137,17 @@ class ShiftWorkflow
             return false;
         }
 
+        if (($attempt->analysis_config['analysis_type'] ?? null) === 'object_detection') {
+            $minimum = $attempt->analysis_config['min_count'] ?? PHP_INT_MAX;
+
+            return match ($check->status) {
+                CheckStatus::Passed => $attempt->observed_outcome === 'present' && $attempt->detected_count >= $minimum && $this->confidentClass($attempt, $check->expected_class),
+                CheckStatus::Failed => $attempt->observed_outcome === 'absent' && $attempt->detected_count < $minimum,
+                CheckStatus::Inconclusive => true,
+                default => false,
+            };
+        }
+
         return match ($check->status) {
             CheckStatus::Passed => $this->confidentClass($attempt, $check->expected_class),
             CheckStatus::Failed => $attempt->absent_class && $this->confidentClass($attempt, $attempt->absent_class),

@@ -50,8 +50,13 @@
                         @else
                             @if(($attempt->analysis_config['provider'] ?? null) === 'roboflow')
                                 @if($attempt->decision_mode === 'advisory')<p class="mt-2 text-sm text-slate-600">Advisory analysis only. Administrator review is required; this observation does not approve or reject the check.</p>@endif
-                                <p class="mt-2 text-sm text-slate-600">Predicted class: {{ $attempt->detected_class }}</p>
-                                <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }} · Model score: {{ number_format($attempt->confidence * 100, 1) }}% (not measured accuracy)</p>
+                                @if(($attempt->analysis_config['analysis_type'] ?? null) === 'object_detection')
+                                    <p class="mt-2 text-sm text-slate-600">Detected: {{ $attempt->detected_count }} × {{ $attempt->analysis_config['passing_class'] }} (required: {{ $attempt->analysis_config['min_count'] }})</p>
+                                    <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }}@if($attempt->detected_class) · Highest model score: {{ number_format($attempt->confidence * 100, 1) }}% (not measured accuracy)@endif</p>
+                                @else
+                                    <p class="mt-2 text-sm text-slate-600">Predicted class: {{ $attempt->detected_class }}</p>
+                                    <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }} · Model score: {{ number_format($attempt->confidence * 100, 1) }}% (not measured accuracy)</p>
+                                @endif
                             @else
                                 <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Confidence: {{ number_format($attempt->confidence * 100, 1) }}%</p>
                             @endif
