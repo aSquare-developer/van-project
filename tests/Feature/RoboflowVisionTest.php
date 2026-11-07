@@ -16,6 +16,7 @@ use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Factory;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Queue;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Str;
@@ -103,12 +104,12 @@ class RoboflowVisionTest extends TestCase
             $this->assertFalse($this->options['allow_redirects']);
             $this->assertSame(5, $this->options['connect_timeout']);
             $this->assertSame(30, $this->options['timeout']);
-            $this->assertSame(['inputs'], array_keys($request->data()));
+            $this->assertSame(['api_key', 'inputs'], array_keys($request->data()));
             $this->assertSame('base64', $request['inputs']['image']['type']);
             $this->assertSame(Storage::disk('inspection-photos')->get($attempt->photo->path), base64_decode($request['inputs']['image']['value'], true));
 
             return $request->url() === 'https://serverless.roboflow.com/infer/workflows/lisettes-workspace/silicone-shelf-status-test'
-                && $request->hasHeader('Authorization', 'Bearer server-test-key')
+                && $request['api_key'] === 'server-test-key' && ! $request->hasHeader('Authorization')
                 && $request->hasHeader('Idempotency-Key', $attempt->submission_key);
         });
         $this->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()->assertSee('Advisory analysis only')
@@ -121,6 +122,35 @@ class RoboflowVisionTest extends TestCase
         $this->signIn(User::factory()->create(['role' => Role::Admin]))->get('/admin/shifts/'.$check->shift_id)->assertOk();
         app(InspectionAnalysis::class)->run($attempt->id);
         Http::assertSentCount(1);
+    }
+
+    public function test_key_is_sent_in_the_json_body_not_the_authorization_header_and_a_real_response_is_accepted(): void
+    {
+        config(['inspections.roboflow.automatic_decisions' => true]);
+        $attempt = $this->attempt($this->check(['model_id' => 'lisettes-workspace/silicone-shelf-status-4-resnet18-t1',
+            'workflow_id' => 'silicone-shelf-status-v4', 'automatic_decisions' => true]));
+        $this->fakeResponse('{"outputs":[{"predictions":{"inference_id":"id","time":0.066,"resolved_model":{"model_id":"lisettes-workspace/silicone-shelf-status-4-resnet18-t1"},'
+            .'"image":{"width":3024,"height":4032},"predictions":[{"class":"occupied","class_id":0,"confidence":0.9905}],"top":"occupied","confidence":0.9905,'
+            .'"prediction_type":"classification"},"inference_id":"id","model_id":"silicone-shelf-status/4"}],"profiler_trace":[]}');
+        app(InspectionAnalysis::class)->run($attempt->id);
+        $this->assertSame('passed', $attempt->refresh()->result);
+        Http::assertSent(fn (Request $request): bool => $request->url() === 'https://serverless.roboflow.com/infer/workflows/lisettes-workspace/silicone-shelf-status-v4'
+            && $request['api_key'] === 'server-test-key' && ! $request->hasHeader('Authorization'));
+    }
+
+    public function test_every_analysis_failure_is_logged_with_a_reason_code_and_no_secrets(): void
+    {
+        Log::spy();
+        $attempt = $this->attempt();
+        $this->fakeResponse(['error' => 'private server-test-key'], 401);
+        app(InspectionAnalysis::class)->run($attempt->id);
+        Log::shouldHaveReceived('warning')->once()->withArgs(function (string $message, array $context) use ($attempt): bool {
+            $this->assertSame(['attempt_id' => $attempt->id, 'error_code' => 'service_unavailable', 'detail' => 'http_401',
+                'retryable' => false, 'analysis_runs' => 1, 'provider' => 'roboflow'], $context);
+            $this->assertStringNotContainsString('server-test-key', $message.json_encode($context));
+
+            return true;
+        });
     }
 
     public function test_class_names_not_class_ids_control_opted_in_decisions_and_low_scores_are_inconclusive(): void

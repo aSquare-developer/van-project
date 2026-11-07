@@ -79,6 +79,13 @@ class InspectionAnalysis
             if ($shift->trashed() || $attempt->status !== 'processing' || $attempt->processing_token !== $claimed->processing_token) {
                 return;
             }
+            if (isset($result['error'])) {
+                Log::warning('Inspection analysis failed.', [
+                    'attempt_id' => $attempt->id, 'error_code' => $result['error'], 'detail' => $result['detail'] ?? null,
+                    'retryable' => $result['retryable'], 'analysis_runs' => $attempt->analysis_runs,
+                    'provider' => $attempt->analysis_config['provider'] ?? 'custom',
+                ]);
+            }
             if (isset($result['error']) && $result['retryable'] && $attempt->analysis_runs < 3) {
                 $attempt->forceFill([
                     'status' => 'uploaded', 'error_code' => $result['error'], 'processing_token' => null,
