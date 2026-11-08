@@ -2,15 +2,16 @@
     <h1 class="mb-3 text-3xl font-semibold">{{ $model->exists ? 'Edit vision model' : 'Add vision model' }}</h1>
     <p class="mb-6 max-w-3xl text-slate-500">Register a trained Roboflow classification or object detection model and its saved Workflow. New objects using this format can be added here without changing the application.</p>
     @php($settings = $model->latestRevision?->settings ?? [])
-    <form method="POST" action="{{ $model->exists ? route('admin.vision-models.update', $model) : route('admin.vision-models.store') }}" class="max-w-3xl space-y-6">
+    @php($isDetection = old('analysis_type', $settings['analysis_type'] ?? 'classification') === 'object_detection')
+    <form method="POST" action="{{ $model->exists ? route('admin.vision-models.update', $model) : route('admin.vision-models.store') }}" class="max-w-3xl space-y-6" data-vision-model-form>
         @csrf
         @if($model->exists) @method('PUT') @endif
         <input type="hidden" name="base_revision" value="{{ old('base_revision', $model->latestRevision?->id) }}">
         <div class="space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             <label class="block">Name<input name="name" value="{{ old('name', $model->name) }}" maxlength="255" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
             <label class="block">Status<select name="status" required class="mt-2 block w-full rounded border border-slate-300 p-3">@foreach(['draft' => 'Draft', 'active' => 'Active', 'disabled' => 'Disabled'] as $key => $label)<option value="{{ $key }}" @selected(old('status', $model->status ?? 'draft') === $key)>{{ $label }}</option>@endforeach</select></label>
-            <label class="block">Analysis type<select name="analysis_type" class="mt-2 block w-full rounded border border-slate-300 p-3">@foreach(['classification' => 'Image classification (e.g. ResNet18)', 'object_detection' => 'Object detection (e.g. RF-DETR)'] as $key => $label)<option value="{{ $key }}" @selected(old('analysis_type', $settings['analysis_type'] ?? 'classification') === $key)>{{ $label }}</option>@endforeach</select></label>
-            <label class="block">Exact Model ID<input name="model_id" value="{{ old('model_id', $settings['model_id'] ?? 'lisettes-workspace/silicone-shelf-status-2-resnet18-t1') }}" maxlength="255" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+            <label class="block">Analysis type<select name="analysis_type" data-analysis-type class="mt-2 block w-full rounded border border-slate-300 p-3">@foreach(['classification' => 'Image classification (e.g. ResNet18)', 'object_detection' => 'Object detection (e.g. RF-DETR)'] as $key => $label)<option value="{{ $key }}" @selected(old('analysis_type', $settings['analysis_type'] ?? 'classification') === $key)>{{ $label }}</option>@endforeach</select></label>
+            <label class="block">Exact Model ID<input name="model_id" value="{{ old('model_id', $settings['model_id'] ?? ($isDetection ? '' : 'lisettes-workspace/silicone-shelf-status-2-resnet18-t1')) }}" data-classification-default="lisettes-workspace/silicone-shelf-status-2-resnet18-t1" maxlength="255" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
             <label class="block">Workspace<input name="workspace" value="{{ old('workspace', $settings['workspace'] ?? 'lisettes-workspace') }}" maxlength="200" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
             <label class="block">Workflow ID<input name="workflow_id" value="{{ old('workflow_id', $settings['workflow_id'] ?? '') }}" maxlength="200" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
             <p class="text-sm text-slate-500">Copy the Model ID and Workflow ID from Roboflow. The Workflow must return one prediction output: a classification result with its resolved model ID, or an object detection result with its image size and list of detections. API keys are configured privately on the server.</p>
@@ -22,12 +23,21 @@
         <div class="space-y-5 rounded-xl border border-slate-200 bg-white p-5 sm:p-6">
             <h2 class="text-xl font-semibold">Inspection rule</h2>
             <div class="grid gap-5 sm:grid-cols-2">
-                <label class="block">Passing class (for detection: the object that must be found)<input name="passing_class" value="{{ old('passing_class', $settings['passing_class'] ?? 'occupied') }}" maxlength="100" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
-                <label class="block">Failing class (classification only)<input name="failing_class" value="{{ old('failing_class', $settings['failing_class'] ?? 'empty') }}" maxlength="100" class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+                <div>
+                    <label class="block">Passing class<input name="passing_class" value="{{ old('passing_class', $settings['passing_class'] ?? ($isDetection ? '' : 'occupied')) }}" data-classification-default="occupied" maxlength="100" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+                    <p data-for="object_detection" class="mt-2 text-sm text-slate-500 {{ $isDetection ? '' : 'hidden' }}">The object that must be found, exactly as named in Roboflow. Letter case and spaces matter, for example <code>paper roll</code>.</p>
+                </div>
+                <div data-for="classification" class="{{ $isDetection ? 'hidden' : '' }}">
+                    <label class="block">Failing class<input name="failing_class" value="{{ old('failing_class', $settings['failing_class'] ?? 'empty') }}" maxlength="100" @disabled($isDetection) class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+                </div>
             </div>
-            <label class="block">Minimum objects found (object detection only)<input type="number" name="min_count" min="1" max="100" step="1" value="{{ old('min_count', $settings['min_count'] ?? 1) }}" class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+            <div data-for="object_detection" class="{{ $isDetection ? '' : 'hidden' }}">
+                <label class="block">Minimum objects found<input type="number" name="min_count" min="1" max="100" step="1" value="{{ old('min_count', $settings['min_count'] ?? 1) }}" @disabled(! $isDetection) class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+            </div>
             @php($uncertain = old('uncertain_classes', $settings['uncertain_classes'] ?? []))
-            <label class="block">Other trained classes that require review (classification only, optional, comma separated)<input name="uncertain_classes" value="{{ is_array($uncertain) ? implode(', ', $uncertain) : $uncertain }}" class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+            <div data-for="classification" class="{{ $isDetection ? 'hidden' : '' }}">
+                <label class="block">Other trained classes that require review (optional, comma separated)<input name="uncertain_classes" value="{{ is_array($uncertain) ? implode(', ', $uncertain) : $uncertain }}" @disabled($isDetection) class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
+            </div>
             <label class="block">Minimum model score (0.01–1)<input type="number" name="confidence_threshold" min="0.01" max="1" step="0.01" value="{{ old('confidence_threshold', $settings['confidence_threshold'] ?? 0.8) }}" required class="mt-2 block w-full rounded border border-slate-300 p-3"></label>
             <input type="hidden" name="automatic_decisions" value="0">
             <label class="flex items-start gap-3"><input type="checkbox" name="automatic_decisions" value="1" @checked(old('automatic_decisions', $settings['automatic_decisions'] ?? false)) class="mt-1"><span>Allow automatic pass/fail for this revision after validation</span></label>

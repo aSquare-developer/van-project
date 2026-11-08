@@ -90,6 +90,22 @@ class VisionCatalogTest extends TestCase
         $this->assertArrayNotHasKey('min_count', VisionModel::where('name', 'Shelf')->firstOrFail()->latestRevision->settings);
     }
 
+    public function test_form_hides_classification_only_fields_and_clears_classification_defaults_for_object_detection(): void
+    {
+        $this->signIn(User::factory()->create(['role' => Role::Admin]));
+        $classification = $this->get('/admin/vision-models/create')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/name="passing_class" value="occupied"/', $classification);
+        $this->assertDoesNotMatchRegularExpression('/name="failing_class"[^>]*disabled/', $classification);
+        $this->assertMatchesRegularExpression('/name="min_count"[^>]*disabled/', $classification);
+
+        $detection = $this->withSession(['_old_input' => ['analysis_type' => 'object_detection']])->get('/admin/vision-models/create')->assertOk()->getContent();
+        $this->assertMatchesRegularExpression('/name="passing_class" value=""/', $detection);
+        $this->assertMatchesRegularExpression('/name="model_id" value=""/', $detection);
+        $this->assertMatchesRegularExpression('/name="failing_class"[^>]*disabled/', $detection);
+        $this->assertMatchesRegularExpression('/name="uncertain_classes"[^>]*disabled/', $detection);
+        $this->assertDoesNotMatchRegularExpression('/name="min_count"[^>]*disabled/', $detection);
+    }
+
     public function test_only_active_admin_can_access_or_modify_catalog(): void
     {
         $model = VisionModel::factory()->create();
