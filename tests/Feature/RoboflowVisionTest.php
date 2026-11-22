@@ -133,8 +133,8 @@ class RoboflowVisionTest extends TestCase
                 && $request['api_key'] === 'server-test-key' && ! $request->hasHeader('Authorization')
                 && $request->hasHeader('Idempotency-Key', $attempt->submission_key);
         });
-        $this->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()->assertSee('Advisory analysis only')
-            ->assertSee('Predicted class: occupied')->assertSee('not measured accuracy')->assertDontSee('server-test-key');
+        $this->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()->assertSee('Waiting for administrator review')
+            ->assertSee('The model sees “occupied” with a score of 96.8%')->assertSee('not measured accuracy')->assertDontSee('server-test-key');
         $this->assertStringNotContainsString('inference_id', $attempt->toJson());
         $this->assertStringNotContainsString('base64', $attempt->toJson());
         $this->post('/shifts/'.$check->shift_id.'/review-request', ['request_key' => Str::uuid()->toString(),
@@ -254,7 +254,7 @@ class RoboflowVisionTest extends TestCase
         app(InspectionAnalysis::class)->run($attempt->id);
         $this->assertSame(CheckStatus::Passed, $check->fresh()->status);
         $this->signIn($check->shift->worker)->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()
-            ->assertSee('Detected: 2 × tube (required: 2)')->assertDontSee('Predicted class');
+            ->assertSee('Check passed with a score of 95.0%.')->assertSee('Found 2 × tube (at least 2 required).')->assertDontSee('Predicted class');
         $this->post('/shifts/'.$check->shift_id.'/complete', ['request_key' => Str::uuid()->toString(), 'revision' => $check->shift->fresh()->revision])
             ->assertRedirect(route('shifts.show', $check->shift_id));
         $this->assertSame(ShiftStatus::Completed, $check->shift->fresh()->status);
