@@ -44,22 +44,11 @@
                     @if($attempt->result)
                         @php($attemptResult = App\Enums\CheckStatus::from($attempt->result))
                         <div class="mt-3"><x-status-badge :status="$attemptResult" /></div>
-                        <p class="mt-3 text-sm text-slate-600">{{ $attemptResult->description() }}</p>
-                        @if($attempt->status === 'error')
-                            <p class="mt-2 text-sm text-slate-600">Analysis is unavailable. Contact your administrator or submit a new photo when the service is available.</p>
-                        @else
-                            @if(($attempt->analysis_config['provider'] ?? null) === 'roboflow')
-                                @if($attempt->decision_mode === 'advisory')<p class="mt-2 text-sm text-slate-600">Advisory analysis only. Administrator review is required; this observation does not approve or reject the check.</p>@endif
-                                @if(($attempt->analysis_config['analysis_type'] ?? null) === 'object_detection')
-                                    <p class="mt-2 text-sm text-slate-600">Detected: {{ $attempt->detected_count }} × {{ $attempt->analysis_config['passing_class'] }} (required: {{ $attempt->analysis_config['min_count'] }})</p>
-                                    <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }}@if($attempt->detected_class) · Highest model score: {{ number_format($attempt->confidence * 100, 1) }}% (not measured accuracy)@endif</p>
-                                @else
-                                    <p class="mt-2 text-sm text-slate-600">Predicted class: {{ $attempt->detected_class }}</p>
-                                    <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }} · Model score: {{ number_format($attempt->confidence * 100, 1) }}% (not measured accuracy)</p>
-                                @endif
-                            @else
-                                <p class="mt-2 text-xs text-slate-500">Model: {{ $attempt->model_version }} · Confidence: {{ number_format($attempt->confidence * 100, 1) }}%</p>
-                            @endif
+                        @php($summary = app(App\Services\AttemptSummary::class)->describe($attempt))
+                        <p class="mt-3 text-base font-semibold text-slate-900">{{ $summary['headline'] }}</p>
+                        <p class="mt-1 text-sm text-slate-600">{{ $summary['detail'] }}</p>
+                        @if($attempt->status !== 'error' && $attempt->model_version)
+                            <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }} · The score is the model's own estimate, not measured accuracy.</p>
                         @endif
                     @else
                         <p class="mt-3 text-sm text-slate-600">{{ $attempt->status === 'processing' ? 'Analysis in progress.' : 'Awaiting analysis.' }} No recognition result has been recorded for this photo. Refresh this page to check for a result.</p>

@@ -85,7 +85,7 @@ class InspectionAnalysisTest extends TestCase
             && $request->hasFile('attempt_id', $attempt->submission_key) && $request->hasFile('image')
             && $request->hasFile('model_version', 'silicone-holder/1'));
         $this->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()
-            ->assertSee('95.0%')->assertSee('required condition was confirmed')
+            ->assertSee('Check passed with a score of 95.0%.')
             ->assertDontSee('server-only-test-token')->assertDontSee($attempt->submission_key);
         $this->assertDatabaseHas('activity_logs', ['event' => 'inspection.analysis_finished']);
         app(InspectionAnalysis::class)->run($attempt->id);
