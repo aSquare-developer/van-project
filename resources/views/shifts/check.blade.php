@@ -47,9 +47,11 @@
                         @php($summary = app(App\Services\AttemptSummary::class)->describe($attempt))
                         <p class="mt-3 text-base font-semibold text-slate-900">{{ $summary['headline'] }}</p>
                         <p class="mt-1 text-sm text-slate-600">{{ $summary['detail'] }}</p>
-                        @if($attempt->status !== 'error' && $attempt->model_version)
-                            <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }} · The score is the model's own estimate, not measured accuracy.</p>
-                        @endif
+                        @can('viewAny', App\Models\VisionModel::class)
+                            @if($attempt->status !== 'error' && $attempt->model_version)
+                                <p class="mt-2 break-all text-xs text-slate-500">Model: {{ $attempt->model_version }} · The score is the model's own estimate, not measured accuracy.</p>
+                            @endif
+                        @endcan
                     @else
                         <p class="mt-3 text-sm text-slate-600">{{ $attempt->status === 'processing' ? 'Analysis in progress.' : 'Awaiting analysis.' }} No recognition result has been recorded for this photo. Refresh this page to check for a result.</p>
                     @endif
