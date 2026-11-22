@@ -134,13 +134,15 @@ class RoboflowVisionTest extends TestCase
                 && $request->hasHeader('Idempotency-Key', $attempt->submission_key);
         });
         $this->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()->assertSee('Waiting for administrator review')
-            ->assertSee('The model sees “occupied” with a score of 96.8%')->assertSee('not measured accuracy')->assertDontSee('server-test-key');
+            ->assertSee('The model sees “occupied” with a score of 96.8%')->assertDontSee('not measured accuracy')->assertDontSee($attempt->model_version)->assertDontSee('server-test-key');
         $this->assertStringNotContainsString('inference_id', $attempt->toJson());
         $this->assertStringNotContainsString('base64', $attempt->toJson());
         $this->post('/shifts/'.$check->shift_id.'/review-request', ['request_key' => Str::uuid()->toString(),
             'revision' => $check->shift->fresh()->revision, 'comment' => 'Pilot result needs review.'])->assertRedirect();
         $this->assertSame(ShiftStatus::AwaitingReview, $check->shift->fresh()->status);
         $this->signIn(User::factory()->create(['role' => Role::Admin]))->get('/admin/shifts/'.$check->shift_id)->assertOk();
+        $this->get('/shifts/'.$check->shift_id.'/checks/'.$check->id)->assertOk()
+            ->assertSee('Model: '.$attempt->model_version)->assertSee('not measured accuracy');
         app(InspectionAnalysis::class)->run($attempt->id);
         Http::assertSentCount(1);
     }
